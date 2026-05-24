@@ -43,6 +43,8 @@
     "@types/react-dom": "^18.3.0",
     "@vitest/coverage-v8": "^1.6.1",
     "drizzle-kit": "^0.21.4",
+    "eslint": "^10.4.0",
+    "eslint-config-next": "^16.2.6",
     "testcontainers": "^10.11.0",
     "tsx": "^4.16.2",
     "typescript": "^5.5.3",
