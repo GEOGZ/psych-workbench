@@ -1,0 +1,41 @@
+import { getServerSession } from 'next-auth';
+import { redirect } from 'next/navigation';
+import { authOptions } from '@/auth/options';
+
+export default async function WorkbenchLayout({
+  children
+}: {
+  children: React.ReactNode;
+}) {
+  const session = await getServerSession(authOptions);
+  if (!session?.user) redirect('/api/auth/signin');
+
+  const role = (session.user as { role?: string }).role;
+  const isContractor = role === 'contractor';
+
+  return (
+    <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
+      <nav style={{ background: '#1a1a2e', color: '#e8e8f0', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+        <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '0.02em' }}>工作台</span>
+        {isContractor ? (
+          <a href="/workbench/contractor" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>我的项目</a>
+        ) : (
+          <>
+            <a href="/workbench" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>首页</a>
+            <a href="/workbench/projects" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>项目</a>
+            <a href="/workbench/clients" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>客户</a>
+            {role === 'owner' && (
+              <a href="/workbench/users" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>用户</a>
+            )}
+          </>
+        )}
+        <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#6060a0' }}>
+          {(session.user as { email?: string }).email}
+        </span>
+      </nav>
+      <main style={{ flex: 1, padding: '1.5rem', background: '#f5f5fa' }}>
+        {children}
+      </main>
+    </div>
+  );
+}

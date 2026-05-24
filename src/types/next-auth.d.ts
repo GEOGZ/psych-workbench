@@ -1,0 +1,14 @@
+import type { DefaultSession } from 'next-auth';
+
+declare module 'next-auth' {
+  interface Session {
+    user?: DefaultSession['user'] & {
+      id: string;
+      role: 'owner' | 'admin' | 'contractor';
+    };
+  }
+
+  interface User {
+    role: 'owner' | 'admin' | 'contractor';
+  }
+}
