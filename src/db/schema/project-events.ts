@@ -19,7 +19,8 @@ export const projectEventType = pgEnum('project_event_type', [
   'checklist_toggled',
   'stage_meta_updated',
   'project_updated',
-  'client_updated'
+  'client_updated',
+  'monthly_retrospective'
 ]);
 
 export type ProjectEventType = (typeof projectEventType.enumValues)[number];
