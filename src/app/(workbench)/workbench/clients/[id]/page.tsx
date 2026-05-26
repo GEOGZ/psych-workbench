@@ -53,6 +53,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
 
   const issueToken = trpc.portal.issueToken.useMutation({ onSuccess: () => refetchTokens() });
   const revokeToken = trpc.portal.revokeToken.useMutation({ onSuccess: () => refetchTokens() });
+  const sendPortalLink = trpc.portal.sendPortalLink.useMutation();
   const updateClient = trpc.clients.update.useMutation({
     onSuccess: () => { refetchClient(); setEditing(false); }
   });
@@ -62,6 +63,7 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
 
   const [expiryDate, setExpiryDate] = useState(defaultExpiry);
   const [copied, setCopied] = useState<string | null>(null);
+  const [sentToken, setSentToken] = useState<string | null>(null);
   const [editing, setEditing] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [editErr, setEditErr] = useState('');
@@ -119,6 +121,12 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
     await navigator.clipboard.writeText(portalUrl(token));
     setCopied(token);
     setTimeout(() => setCopied(null), 2000);
+  }
+
+  async function handleSend(tokenId: string) {
+    await sendPortalLink.mutateAsync({ tokenId });
+    setSentToken(tokenId);
+    setTimeout(() => setSentToken(null), 3000);
   }
 
   if (loadingClient) return <p style={{ color: '#888' }}>加载中…</p>;
@@ -310,6 +318,13 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
                 </div>
                 <button onClick={() => handleCopy(t.token)} style={{ padding: '0.25rem 0.6rem', borderRadius: 4, border: '1px solid #c7c7f0', background: copied === t.token ? '#e8f8e8' : '#fff', color: copied === t.token ? '#065f46' : '#4a4af0', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}>
                   {copied === t.token ? '已复制 ✓' : '复制链接'}
+                </button>
+                <button
+                  onClick={() => handleSend(t.id)}
+                  disabled={sendPortalLink.isPending}
+                  style={{ padding: '0.25rem 0.6rem', borderRadius: 4, border: '1px solid #c7c7f0', background: sentToken === t.id ? '#e8f8e8' : '#fff', color: sentToken === t.id ? '#065f46' : '#4a4af0', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap' }}
+                >
+                  {sentToken === t.id ? '已发送 ✓' : sendPortalLink.isPending ? '发送中…' : '发送邮件'}
                 </button>
                 <button onClick={() => revokeToken.mutate({ tokenId: t.id })} disabled={revokeToken.isPending} style={{ padding: '0.25rem 0.6rem', borderRadius: 4, border: '1px solid #fca5a5', background: '#fff', color: '#c00', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>
                   撤销

@@ -8,6 +8,7 @@ import { projects } from '@/db/schema/projects';
 import { clients } from '@/db/schema/clients';
 import { projectChecklistItems } from '@/db/schema/checklist';
 import { randomBytes } from 'crypto';
+import { mailer } from '@/server/email/mailer';
 import type { DbClient } from '@/db';
 
 const TOKEN_BYTES = 32;
@@ -219,5 +220,49 @@ export const portalRouter = router({
         },
         orderBy: (t, { desc }) => [desc(t.issuedAt)]
       });
-    })
+    }),
+
+  /**
+   * Send the portal link to the client's contact email.
+   */
+  sendPortalLink: protectedProcedure
+    .use(adminOrOwner)
+    .input(z.object({ tokenId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const tokenRow = await ctx.db.query.clientPortalTokens.findFirst({
+        where: and(
+          eq(clientPortalTokens.id, input.tokenId),
+          isNull(clientPortalTokens.revokedAt),
+          gt(clientPortalTokens.expiresAt, new Date())
+        ),
+        columns: { id: true, token: true, clientId: true, expiresAt: true }
+      });
+      if (!tokenRow) throw new TRPCError({ code: 'NOT_FOUND', message: 'Token 无效或已过期' });
+
+      const client = await ctx.db.query.clients.findFirst({
+        where: eq(clients.id, tokenRow.clientId),
+        columns: { name: true, contactEmail: true, contactName: true }
+      });
+      if (!client?.contactEmail) {
+        throw new TRPCError({ code: 'PRECONDITION_FAILED', message: '客户未填写联系邮箱，无法发送' });
+      }
+
+      const base = process.env.PORTAL_BASE_URL ?? process.env.NEXTAUTH_URL ?? 'http://localhost:3000';
+      const portalUrl = `${base}/portal/${tokenRow.token}`;
+      const expiry = new Date(tokenRow.expiresAt).toLocaleDateString('zh-CN');
+
+      await mailer.sendMail({
+        from: process.env.EMAIL_FROM,
+        to: client.contactEmail,
+        subject: '您的咨询项目进度门户链接',
+        html: `<p>您好，${client.contactName}，</p>
+<p>以下是您的专属项目进度门户链接，有效期至 <strong>${expiry}</strong>：</p>
+<p><a href="${portalUrl}" style="color:#4a4af0;font-weight:bold;">${portalUrl}</a></p>
+<p>通过此链接，您可以随时查看项目进展和阶段状态。</p>
+<p>如有疑问，请联系您的顾问。</p>`,
+        text: `您好，${client.contactName}，\n\n您的项目门户链接（有效期至 ${expiry}）：\n${portalUrl}\n\n如有疑问请联系您的顾问。`
+      });
+
+      return { ok: true };
+    }),
 });

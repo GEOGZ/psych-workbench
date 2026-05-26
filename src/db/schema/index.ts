@@ -10,3 +10,5 @@ export * from './accounts';
 export * from './sessions';
 export * from './verification-tokens';
 export * from './checklist';
+export * from './job-profiles';
+export * from './assessment-tools';

@@ -25,6 +25,9 @@ export default async function WorkbenchLayout({
             <a href="/workbench" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>首页</a>
             <a href="/workbench/projects" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>项目</a>
             <a href="/workbench/clients" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>客户</a>
+            <a href="/workbench/job-profiles" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>岗位画像</a>
+            <a href="/workbench/assessment-tools" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>测评工具</a>
+            <a href="/workbench/reports" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>报表</a>
             {role === 'owner' && (
               <a href="/workbench/users" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>用户</a>
             )}

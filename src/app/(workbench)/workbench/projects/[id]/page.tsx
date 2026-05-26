@@ -24,6 +24,41 @@ function defaultExpiry() {
   return d.toISOString().slice(0, 10);
 }
 
+function JobProfilePanel({ projectId, currentProfileId, onChanged }: { projectId: string; currentProfileId: string | null; onChanged: () => void }) {
+  const { data: profiles = [] } = trpc.jobProfiles.list.useQuery();
+  const setProfile = trpc.projects.setJobProfile.useMutation({ onSuccess: onChanged });
+  const current = profiles.find(p => p.id === currentProfileId);
+
+  return (
+    <div style={{ background: '#fff', borderRadius: 8, padding: '1rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', marginTop: '1rem' }}>
+      <p style={{ margin: '0 0 0.6rem', fontSize: '0.8rem', color: '#888', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.06em' }}>岗位画像</p>
+      {current ? (
+        <div style={{ display: 'flex', alignItems: 'center', gap: '0.75rem', marginBottom: '0.6rem' }}>
+          <a href={`/workbench/job-profiles/${current.id}`} style={{ fontWeight: 600, fontSize: '0.875rem', color: '#4a4af0', textDecoration: 'none' }}>{current.name}</a>
+          {current.department && <span style={{ fontSize: '0.75rem', color: '#666', background: '#f0f0f8', padding: '0.15rem 0.4rem', borderRadius: 20 }}>{current.department}</span>}
+          <button onClick={() => setProfile.mutate({ projectId, jobProfileId: null })} disabled={setProfile.isPending} style={{ marginLeft: 'auto', padding: '0.2rem 0.55rem', borderRadius: 4, border: '1px solid #ddd', background: '#fff', color: '#888', cursor: 'pointer', fontSize: '0.75rem' }}>解除绑定</button>
+        </div>
+      ) : (
+        <p style={{ margin: '0 0 0.6rem', fontSize: '0.875rem', color: '#888' }}>暂未绑定岗位画像。</p>
+      )}
+      {profiles.length > 0 && (
+        <select
+          value={currentProfileId ?? ''}
+          onChange={e => setProfile.mutate({ projectId, jobProfileId: e.target.value || null })}
+          disabled={setProfile.isPending}
+          style={{ padding: '0.35rem 0.6rem', border: '1px solid #ddd', borderRadius: 5, fontSize: '0.8rem', minWidth: 200 }}
+        >
+          <option value="">选择岗位画像…</option>
+          {profiles.map(p => <option key={p.id} value={p.id}>{p.name}{p.department ? ` · ${p.department}` : ''}</option>)}
+        </select>
+      )}
+      {profiles.length === 0 && (
+        <a href="/workbench/job-profiles/new" style={{ fontSize: '0.8rem', color: '#4a4af0', textDecoration: 'none' }}>前往创建岗位画像 →</a>
+      )}
+    </div>
+  );
+}
+
 function GrantsPanel({ projectId }: { projectId: string }) {
   const { data: grants = [], refetch } = trpc.grants.listForProject.useQuery({ projectId });
   const { data: contractors = [] } = trpc.grants.listContractors.useQuery();
@@ -305,6 +340,8 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
           />
         </div>
       )}
+
+      <JobProfilePanel projectId={project.id} currentProfileId={(project as Record<string, unknown>).jobProfileId as string | null ?? null} onChanged={refetch} />
 
       <GrantsPanel projectId={project.id} />
 

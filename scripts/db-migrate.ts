@@ -1,6 +1,19 @@
 import { readdir, readFile } from 'node:fs/promises';
+import { readFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { Pool } from 'pg';
+
+// Load .env so the script works standalone without exporting DATABASE_URL manually
+try {
+  const envText = readFileSync(join(process.cwd(), '.env'), 'utf8');
+  for (const line of envText.split('\n')) {
+    const m = line.match(/^([A-Z_][A-Z0-9_]*)=(.+)$/);
+    if (m) {
+      const [, key, val] = m as [string, string, string];
+      if (!process.env[key]) process.env[key] = val.trim();
+    }
+  }
+} catch { /* .env not found, rely on environment */ }
 
 const MIGRATIONS_DIR = join(process.cwd(), 'src', 'db', 'migrations');
 

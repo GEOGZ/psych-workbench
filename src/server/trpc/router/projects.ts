@@ -263,5 +263,50 @@ export const projectsRouter = router({
           )
         )
         .orderBy(sql`${projects.stageMeta}->>'paymentDueDate' ASC NULLS LAST`)
-    )
+    ),
+
+  setJobProfile: protectedProcedure
+    .input(z.object({ projectId: z.string().uuid(), jobProfileId: z.string().uuid().nullable() }))
+    .use(adminOrOwner)
+    .mutation(async ({ input, ctx }) => {
+      const [row] = await ctx.db
+        .update(projects)
+        .set({ jobProfileId: input.jobProfileId, updatedAt: new Date() })
+        .where(eq(projects.id, input.projectId))
+        .returning();
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
+      return row;
+    }),
+
+  listFollowUpAlerts: protectedProcedure
+    .use(adminOrOwner)
+    .query(async ({ ctx }) => {
+      const rows = await ctx.db
+        .select({ id: projects.id, title: projects.title, state: projects.state, stageMeta: projects.stageMeta, updatedAt: projects.updatedAt })
+        .from(projects)
+        .where(sql`${projects.state} NOT IN ('done', 'closing')`);
+
+      const now = Date.now();
+      const staleThresholdMs = 14 * 24 * 3600 * 1000;
+
+      return rows.flatMap(p => {
+        const meta = (p.stageMeta ?? {}) as Record<string, unknown>;
+        const alerts: { projectId: string; title: string; type: 'cooling' | 'stale'; detail: string }[] = [];
+
+        if (p.state === 'discovery' && typeof meta._discountCoolingSince === 'string') {
+          const elapsed = now - new Date(meta._discountCoolingSince).getTime();
+          const remainH = Math.ceil((24 * 3600 * 1000 - elapsed) / 3600000);
+          if (remainH > 0) {
+            alerts.push({ projectId: p.id, title: p.title, type: 'cooling', detail: `折扣冷静期，还需约 ${remainH} 小时方可推进` });
+          }
+        }
+
+        const updatedAt = typeof p.updatedAt === 'string' ? p.updatedAt : (p.updatedAt as Date).toISOString();
+        if (now - new Date(updatedAt).getTime() > staleThresholdMs) {
+          alerts.push({ projectId: p.id, title: p.title, type: 'stale', detail: `已 ${Math.floor((now - new Date(updatedAt).getTime()) / 86400000)} 天未更新` });
+        }
+
+        return alerts;
+      });
+    }),
 });

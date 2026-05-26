@@ -29,6 +29,8 @@ export const projects = pgTable('projects', {
 
   stageMeta: jsonb('stage_meta').$type<Record<string, unknown>>().notNull().default({}),
 
+  jobProfileId: uuid('job_profile_id'),
+
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });

@@ -5,6 +5,7 @@ import { trpc } from '@/lib/trpc';
 import { HatWidget } from '@/components/HatWidget';
 import { HatBackfillForm } from '@/components/HatBackfillForm';
 import { ReceivablesPanel } from '@/components/ReceivablesPanel';
+import { FollowUpAlertsPanel } from '@/components/FollowUpAlertsPanel';
 import type { ProjectState } from '@/db/schema/projects';
 
 const STATE_ZH = {
@@ -122,6 +123,9 @@ export default function DashboardPage() {
           ))}
         </div>
       )}
+
+      {/* ── Follow-up alerts ─────────────────────────────────────────── */}
+      <FollowUpAlertsPanel />
 
       {/* ── Receivables ──────────────────────────────────────────────── */}
       <ReceivablesPanel />
