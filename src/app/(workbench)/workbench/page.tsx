@@ -1,9 +1,10 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 import { HatWidget } from '@/components/HatWidget';
 import { HatBackfillForm } from '@/components/HatBackfillForm';
+import { ReceivablesPanel } from '@/components/ReceivablesPanel';
 import type { ProjectState } from '@/db/schema/projects';
 
 const STATE_ZH = {
@@ -25,10 +26,25 @@ const STATE_COLOR = {
 
 const FUNNEL_STAGES: ProjectState[] = ['lead', 'qualifying', 'discovery', 'contract', 'execution', 'reporting'];
 
+function daysUntil(date: unknown): number {
+  return Math.ceil((new Date(date as string).getTime() - Date.now()) / 86400000);
+}
+
 export default function DashboardPage() {
   const [showBackfill, setShowBackfill] = useState(false);
   const [period, setPeriod] = useState<'all' | 'month' | 'quarter'>('all');
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const mq = window.matchMedia('(max-width: 640px)');
+    setIsMobile(mq.matches);
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
+
   const { data: projects = [] } = trpc.projects.list.useQuery();
+  const { data: expiring = [] } = trpc.grants.listExpiringSoon.useQuery();
 
   const displayProjects = projects.filter(p => {
     if (period === 'all') return true;
@@ -58,6 +74,14 @@ export default function DashboardPage() {
     ? Math.round(npsValues.reduce((a, b) => a + b, 0) / npsValues.length)
     : null;
 
+  const receivablesAmount = displayProjects.reduce((sum, p) => {
+    const meta = p.stageMeta as Record<string, unknown>;
+    const status = meta?.finalPaymentStatus as string | undefined;
+    if (!status?.startsWith('pending') && !status?.startsWith('partial')) return sum;
+    const contract = typeof meta?.contractAmount === 'number' ? meta.contractAmount : 0;
+    const actual = typeof meta?.actualRevenue === 'number' ? meta.actualRevenue : 0;
+    return sum + Math.max(0, contract - actual);
+  }, 0);
   const pendingReceivables = displayProjects.filter(p => {
     const s = (p.stageMeta as Record<string, unknown>)?.finalPaymentStatus as string | undefined;
     return s?.startsWith('pending') || s?.startsWith('partial');
@@ -65,8 +89,43 @@ export default function DashboardPage() {
 
   const activeProjects = displayProjects.filter(p => p.state !== 'done' && p.state !== 'closing').length;
 
+  // ── Expiring grant alerts ─────────────────────────────────────────────────
+  const urgentGrants = expiring.filter(g => daysUntil(g.expiresAt) <= 7);
+  const warnGrants = expiring.filter(g => daysUntil(g.expiresAt) > 7);
+
   return (
     <div>
+      {/* ── Expiring grant alerts ─────────────────────────────────────── */}
+      {expiring.length > 0 && (
+        <div style={{ marginBottom: '1rem', display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+          {urgentGrants.map(g => (
+            <div key={g.id} style={{
+              background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 7,
+              padding: '0.5rem 0.85rem', fontSize: '0.8rem', color: '#b91c1c',
+              display: 'flex', alignItems: 'center', gap: '0.5rem'
+            }}>
+              <span style={{ fontWeight: 700 }}>⚠ 紧急</span>
+              <span>协作者 <strong>{g.user.name ?? g.user.email}</strong> 在项目「{g.project.title}」的授权将于 <strong>{daysUntil(g.expiresAt)} 天</strong>后到期</span>
+              <a href={`/workbench/projects/${g.projectId}`} style={{ marginLeft: 'auto', color: '#b91c1c', fontWeight: 600, whiteSpace: 'nowrap' }}>前往续期 →</a>
+            </div>
+          ))}
+          {warnGrants.map(g => (
+            <div key={g.id} style={{
+              background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 7,
+              padding: '0.5rem 0.85rem', fontSize: '0.8rem', color: '#92400e',
+              display: 'flex', alignItems: 'center', gap: '0.5rem'
+            }}>
+              <span style={{ fontWeight: 700 }}>提醒</span>
+              <span>协作者 <strong>{g.user.name ?? g.user.email}</strong> 在项目「{g.project.title}」的授权将于 <strong>{daysUntil(g.expiresAt)} 天</strong>后到期</span>
+              <a href={`/workbench/projects/${g.projectId}`} style={{ marginLeft: 'auto', color: '#92400e', fontWeight: 600, whiteSpace: 'nowrap' }}>前往续期 →</a>
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* ── Receivables ──────────────────────────────────────────────── */}
+      <ReceivablesPanel />
+
       {/* ── Pipeline funnel ─────────────────────────────────────────── */}
       <div style={{ marginBottom: '1.5rem' }}>
         <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.5rem', marginBottom: '0.75rem' }}>
@@ -85,7 +144,7 @@ export default function DashboardPage() {
             ))}
           </div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: '0.5rem' }}>
+        <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(3, 1fr)' : 'repeat(6, 1fr)', gap: '0.5rem' }}>
           {FUNNEL_STAGES.map(s => {
             const count = stageCounts[s] ?? 0;
             const color = STATE_COLOR[s as keyof typeof STATE_COLOR];
@@ -114,12 +173,17 @@ export default function DashboardPage() {
       </div>
 
       {/* ── KPI row ──────────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? 'repeat(2, 1fr)' : 'repeat(4, 1fr)', gap: '0.75rem', marginBottom: '1.5rem' }}>
         {[
           { label: '活跃项目', value: activeProjects, sub: wip > 0 ? `${wip} 个执行中` : '无执行中', warn: wip >= 3 },
           { label: '签约总金额', value: totalRevenue > 0 ? `¥${(totalRevenue / 10000).toFixed(1)}万` : '—', sub: '已填写合同额', warn: false },
           { label: '平均 NPS', value: avgNps !== null ? avgNps : '—', sub: npsValues.length > 0 ? `${npsValues.length} 个已评分` : '暂无数据', warn: avgNps !== null && avgNps < 0 },
-          { label: '待收款项目', value: pendingReceivables, sub: pendingReceivables > 0 ? '需跟进' : '全部到账', warn: pendingReceivables > 0 },
+          {
+            label: '待收款',
+            value: receivablesAmount > 0 ? `¥${(receivablesAmount / 10000).toFixed(1)}万` : pendingReceivables > 0 ? `${pendingReceivables} 项` : '—',
+            sub: pendingReceivables > 0 ? `${pendingReceivables} 个项目待收` : '全部到账',
+            warn: pendingReceivables > 0
+          },
         ].map(({ label, value, sub, warn }) => (
           <div key={label} style={{
             background: '#fff', borderRadius: 8, padding: '0.85rem 1rem',
@@ -134,7 +198,7 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Main two-col ─────────────────────────────────────────────── */}
-      <div style={{ display: 'grid', gridTemplateColumns: '380px 1fr', gap: '1.5rem', alignItems: 'start' }}>
+      <div style={{ display: 'grid', gridTemplateColumns: isMobile ? '1fr' : '380px 1fr', gap: '1.5rem', alignItems: 'start' }}>
         <div style={{ display: 'flex', flexDirection: 'column', gap: '1rem' }}>
           <HatWidget onBackfillClick={() => setShowBackfill(s => !s)} />
           {showBackfill && <HatBackfillForm onClose={() => setShowBackfill(false)} />}
@@ -162,10 +226,10 @@ export default function DashboardPage() {
                     }}>
                       {STATE_ZH[p.state as keyof typeof STATE_ZH] ?? p.state}
                     </span>
-                    <span style={{ fontSize: '0.875rem', fontWeight: 500, flex: 1 }}>
+                    <span style={{ fontSize: '0.875rem', fontWeight: 500, flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                       {(p as Record<string, unknown>).title as string ?? p.id}
                     </span>
-                    <span style={{ fontSize: '0.72rem', color: '#aaa' }}>
+                    <span style={{ fontSize: '0.72rem', color: '#aaa', whiteSpace: 'nowrap' }}>
                       {new Date((p as Record<string, unknown>).updatedAt as string).toLocaleDateString('zh-CN')}
                     </span>
                   </a>

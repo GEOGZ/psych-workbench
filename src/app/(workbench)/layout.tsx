@@ -1,6 +1,7 @@
 import { getServerSession } from 'next-auth';
 import { redirect } from 'next/navigation';
 import { authOptions } from '@/auth/options';
+import { GlobalSearch } from '@/components/GlobalSearch';
 
 export default async function WorkbenchLayout({
   children
@@ -15,7 +16,7 @@ export default async function WorkbenchLayout({
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
-      <nav style={{ background: '#1a1a2e', color: '#e8e8f0', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem' }}>
+      <nav style={{ background: '#1a1a2e', color: '#e8e8f0', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
         <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '0.02em' }}>工作台</span>
         {isContractor ? (
           <a href="/workbench/contractor" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>我的项目</a>
@@ -27,6 +28,7 @@ export default async function WorkbenchLayout({
             {role === 'owner' && (
               <a href="/workbench/users" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>用户</a>
             )}
+            <GlobalSearch />
           </>
         )}
         <span style={{ marginLeft: 'auto', fontSize: '0.75rem', color: '#6060a0' }}>

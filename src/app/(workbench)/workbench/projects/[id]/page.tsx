@@ -7,6 +7,9 @@ import { ImeTextarea } from '@/components/ime';
 import { AdvanceProjectButton } from '@/components/AdvanceProjectButton';
 import { StagePanel } from '@/components/StagePanel';
 import { EventTimeline } from '@/components/EventTimeline';
+import { MonthlyRetrospectivePanel } from '@/components/MonthlyRetrospectivePanel';
+import { generateProjectCsv, downloadCsv } from '@/lib/export-project-csv';
+import { CHECKLIST_KEYS } from '@/lib/checklist-defs';
 import type { ProjectState } from '@/db/schema/projects';
 
 const STATE_ZH: Record<ProjectState, string> = {
@@ -80,11 +83,16 @@ function GrantsPanel({ projectId }: { projectId: string }) {
 
 export default function ProjectDetailPage({ params }: { params: { id: string } }) {
   const router = useRouter();
+  const utils = trpc.useUtils();
   const { data: project, isLoading, refetch } = trpc.projects.getById.useQuery(
     { projectId: params.id },
     { enabled: !!params.id }
   );
   const { data: events = [], refetch: refetchEvents } = trpc.projects.listEvents.useQuery(
+    { projectId: params.id },
+    { enabled: !!params.id }
+  );
+  const { data: checklistItems = [] } = trpc.checklist.getForProject.useQuery(
     { projectId: params.id },
     { enabled: !!params.id }
   );
@@ -105,6 +113,20 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const [editNotes, setEditNotes] = useState('');
   const [editErr, setEditErr] = useState('');
   const [deleteErr, setDeleteErr] = useState('');
+  const [exporting, setExporting] = useState(false);
+
+  async function handleExport() {
+    if (!project) return;
+    setExporting(true);
+    try {
+      const data = await utils.projects.getFullReport.fetch({ projectId: params.id });
+      const csv = generateProjectCsv(data);
+      const safeTitle = (title as string).replace(/[^一-龥\w-]/g, '_').slice(0, 40);
+      downloadCsv(`项目报告_${safeTitle}_${new Date().toISOString().slice(0, 10)}.csv`, csv);
+    } finally {
+      setExporting(false);
+    }
+  }
 
   function startEdit() {
     if (!project) return;
@@ -130,6 +152,43 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
   const notes = (project as Record<string, unknown>).notes as string | undefined;
   const updatedAt = (project as Record<string, unknown>).updatedAt as string;
 
+  const requiredKeys = CHECKLIST_KEYS[project.state] ?? [];
+  const checkedSet = new Set(
+    checklistItems.filter(i => i.stage === project.state && i.checked).map(i => i.key)
+  );
+  const missingCount = requiredKeys.filter(k => !checkedSet.has(k)).length;
+  const checklistBlockReason = missingCount > 0
+    ? `请先完成本阶段的自检清单（还差 ${missingCount} 项）`
+    : undefined;
+
+  let thresholdBlockReason: string | undefined;
+  if (project.state === 'discovery') {
+    const meta = (project as Record<string, unknown>).stageMeta as Record<string, unknown> ?? {};
+    const dr = typeof meta.discountRate === 'number' ? meta.discountRate : null;
+    const ca = typeof meta.contractAmount === 'number' ? meta.contractAmount : null;
+    if (dr !== null && dr < 70) {
+      thresholdBlockReason = `折扣率 ${dr}% 低于 70% 红线，不可进入合同阶段`;
+    } else if (dr !== null && dr >= 70 && dr < 85) {
+      const since = typeof meta._discountCoolingSince === 'string' ? meta._discountCoolingSince : null;
+      if (!since) {
+        thresholdBlockReason = '折扣率触发 24h 冷静期，请先保存阶段数据启动计时';
+      } else {
+        const remainMs = 24 * 3600 * 1000 - (Date.now() - new Date(since).getTime());
+        if (remainMs > 0) {
+          thresholdBlockReason = `折扣冷静期中，还需约 ${Math.ceil(remainMs / 3600000)} 小时`;
+        }
+      }
+    }
+    if (!thresholdBlockReason && ca !== null && ca > 200000) {
+      const reviewed = typeof meta._lawyerReviewConfirmed === 'string' ? meta._lawyerReviewConfirmed : '';
+      if (!reviewed.startsWith('yes')) {
+        thresholdBlockReason = `合同金额 ¥${(ca / 10000).toFixed(1)}万 需律师审核确认后方可推进`;
+      }
+    }
+  }
+
+  const blockReason = checklistBlockReason ?? thresholdBlockReason;
+
   return (
     <div style={{ maxWidth: 600 }}>
       <div style={{ marginBottom: '0.5rem' }}>
@@ -145,6 +204,13 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
               style={{ padding: '0.3rem 0.75rem', borderRadius: 5, border: '1px solid #c7c7f0', background: '#fff', color: '#4a4af0', cursor: 'pointer', fontSize: '0.8rem', fontWeight: 600 }}
             >
               编辑
+            </button>
+            <button
+              onClick={handleExport}
+              disabled={exporting}
+              style={{ padding: '0.3rem 0.75rem', borderRadius: 5, border: '1px solid #c7c7f0', background: '#fff', color: '#4a4af0', cursor: exporting ? 'not-allowed' : 'pointer', fontSize: '0.8rem', fontWeight: 600, opacity: exporting ? 0.6 : 1 }}
+            >
+              {exporting ? '导出中…' : '导出 CSV'}
             </button>
             {project.state === 'lead' && (
               <button
@@ -235,6 +301,7 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
             projectId={project.id}
             currentState={project.state}
             onAdvanced={() => { refetch(); refetchEvents(); }}
+            blockReason={blockReason}
           />
         </div>
       )}
@@ -261,6 +328,8 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
           </button>
         </div>
       </div>
+
+      <MonthlyRetrospectivePanel projectId={project.id} />
 
       <EventTimeline events={events} />
     </div>

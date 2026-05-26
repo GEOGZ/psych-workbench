@@ -15,9 +15,10 @@ interface AdvanceProjectButtonProps {
   projectId: string;
   currentState: ProjectState;
   onAdvanced: () => void;
+  blockReason?: string;
 }
 
-export function AdvanceProjectButton({ projectId, currentState, onAdvanced }: AdvanceProjectButtonProps) {
+export function AdvanceProjectButton({ projectId, currentState, onAdvanced, blockReason }: AdvanceProjectButtonProps) {
   const [toast, setToast] = useState('');
   const utils = trpc.useContext();
 
@@ -37,19 +38,26 @@ export function AdvanceProjectButton({ projectId, currentState, onAdvanced }: Ad
 
   if (nextStates.length === 0 && prevStates.length === 0) return null;
 
+  const forwardBlocked = advance.isPending || !!blockReason;
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '0.5rem' }}>
+      {blockReason && (
+        <div style={{ fontSize: '0.8rem', color: '#92400e', background: '#fffbeb', border: '1px solid #fcd34d', padding: '0.35rem 0.65rem', borderRadius: 5 }}>
+          {blockReason}
+        </div>
+      )}
       {nextStates.length > 0 && (
         <div style={{ display: 'flex', gap: '0.5rem', flexWrap: 'wrap' }}>
           {nextStates.map(target => (
             <button
               key={target}
               onClick={() => advance.mutate({ projectId, toState: target })}
-              disabled={advance.isPending}
+              disabled={forwardBlocked}
               style={{
                 padding: '0.4rem 0.9rem', borderRadius: 5, border: '1px solid #4a4af0',
-                background: '#fff', color: '#4a4af0', cursor: 'pointer', fontSize: '0.875rem',
-                fontWeight: 600, opacity: advance.isPending ? 0.6 : 1
+                background: '#fff', color: '#4a4af0', cursor: forwardBlocked ? 'not-allowed' : 'pointer',
+                fontSize: '0.875rem', fontWeight: 600, opacity: forwardBlocked ? 0.4 : 1
               }}
             >
               推进至 {STATE_ZH[target]}

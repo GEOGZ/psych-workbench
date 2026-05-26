@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { and, eq, gt, isNull } from 'drizzle-orm';
+import { and, eq, gt, lt, isNull } from 'drizzle-orm';
 import { router, protectedProcedure } from '../trpc';
 import { adminOrOwner } from '../middleware';
 import { contractorGrants } from '@/db/schema/contractor-grants';
@@ -133,6 +133,42 @@ export const grantsRouter = router({
       return myProjects.map(p => ({
         ...p,
         grantExpiresAt: grants.find(g => g.projectId === p.id)!.expiresAt
+      }));
+    }),
+
+  /** List active grants expiring within 14 days (for dashboard alert). */
+  listExpiringSoon: protectedProcedure
+    .use(adminOrOwner)
+    .query(async ({ ctx }) => {
+      const now = new Date();
+      const in14d = new Date(now.getTime() + 14 * 24 * 60 * 60 * 1000);
+      const grants = await ctx.db.query.contractorGrants.findMany({
+        where: and(
+          isNull(contractorGrants.revokedAt),
+          gt(contractorGrants.expiresAt, now),
+          lt(contractorGrants.expiresAt, in14d)
+        ),
+        columns: { id: true, userId: true, projectId: true, expiresAt: true }
+      });
+      if (grants.length === 0) return [];
+      const userIds = [...new Set(grants.map(g => g.userId))];
+      const projectIds = [...new Set(grants.map(g => g.projectId))];
+      const [grantUsers, grantProjects] = await Promise.all([
+        ctx.db.query.users.findMany({
+          where: (u, { inArray }) => inArray(u.id, userIds),
+          columns: { id: true, name: true, email: true }
+        }),
+        ctx.db.query.projects.findMany({
+          where: (p, { inArray }) => inArray(p.id, projectIds),
+          columns: { id: true, title: true }
+        })
+      ]);
+      const userMap = Object.fromEntries(grantUsers.map(u => [u.id, u]));
+      const projectMap = Object.fromEntries(grantProjects.map(p => [p.id, p]));
+      return grants.map(g => ({
+        ...g,
+        user: userMap[g.userId] ?? { id: g.userId, name: null, email: '(unknown)' },
+        project: projectMap[g.projectId] ?? { id: g.projectId, title: '(unknown)' }
       }));
     })
 });

@@ -19,6 +19,7 @@ const EVENT_ICON: Record<string, string> = {
   contractor_revoked:  '👤',
   project_updated:     '✎',
   client_updated:      '✎',
+  monthly_retrospective: '🔄',
 };
 
 const EVENT_LABEL: Record<string, (p: Record<string, unknown>) => string> = {
@@ -33,6 +34,7 @@ const EVENT_LABEL: Record<string, (p: Record<string, unknown>) => string> = {
   contractor_revoked:  () => '移除了协作者',
   project_updated:     p => `编辑了项目信息${Object.keys(p).length ? `（${Object.keys(p).join('、')}）` : ''}`,
   client_updated:      p => `编辑了客户信息${Object.keys(p).length ? `（${Object.keys(p).join('、')}）` : ''}`,
+  monthly_retrospective: p => `[${p.month}] 月度复盘：${String(p.content ?? '').slice(0, 50)}${String(p.content ?? '').length > 50 ? '…' : ''}`,
 };
 
 interface Props {

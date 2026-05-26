@@ -3,49 +3,7 @@
 import { useState } from 'react';
 import { trpc } from '@/lib/trpc';
 import type { ProjectState } from '@/db/schema/projects';
-
-// ─── Checklist definitions per stage ─────────────────────────────────────────
-
-const CHECKLISTS: Record<ProjectState, Array<{ key: string; label: string }>> = {
-  lead: [
-    { key: 'client_info_complete', label: '客户基本信息已完整录入' },
-    { key: 'initial_call_done', label: '初步沟通已完成（30-60分钟）' },
-    { key: 'feasibility_assessed', label: '可行性评估矩阵已填写' },
-    { key: 'go_decision_made', label: 'Go/No-Go 决策已记录' },
-  ],
-  qualifying: [
-    { key: 'requirements_surveyed', label: '需求调研已完成（业务/技术/合规三维度）' },
-    { key: 'requirements_doc_drafted', label: '需求确认书已起草' },
-    { key: 'assessment_plan_designed', label: '测评方案已设计完成' },
-    { key: 'client_confirmed_plan', label: '客户已书面确认方案' },
-  ],
-  discovery: [
-    { key: 'quote_sent', label: '报价单已发送并获客户确认' },
-    { key: 'contract_amount_set', label: '合同金额已确定' },
-    { key: 'compliance_checklist_done', label: '合规清单已完成（个保法/数据安全）' },
-    { key: 'contract_signed', label: '合同已正式签署' },
-  ],
-  contract: [
-    { key: 'kickoff_meeting_done', label: '项目启动会已完成' },
-    { key: 'system_configured', label: '系统配置已完成并测试通过' },
-    { key: 'invitations_sent', label: '参与者邀请已完成（交付率≥95%）' },
-    { key: 'data_quality_passed', label: '数据质量检查已通过' },
-  ],
-  execution: [
-    { key: 'individual_reports_done', label: '个人报告已生成并审核' },
-    { key: 'group_report_done', label: '群体报告已生成并审核' },
-    { key: 'reports_delivered', label: '报告已交付客户' },
-    { key: 'delivery_confirmed', label: '客户已签署交付确认书' },
-  ],
-  reporting: [
-    { key: 'final_payment_received', label: '尾款已收取' },
-    { key: 'satisfaction_survey_done', label: '满意度调查已完成（NPS已计算）' },
-    { key: 'debrief_done', label: '项目复盘会已完成' },
-    { key: 'closeout_archived', label: '结项文档已归档' },
-  ],
-  closing: [],
-  done: [],
-};
+import { CHECKLISTS } from '@/lib/checklist-defs';
 
 // ─── Stage metadata field definitions ────────────────────────────────────────
 
@@ -61,6 +19,8 @@ const STAGE_FIELDS: Record<ProjectState, FieldDef[]> = {
   lead: [
     { key: 'clientTier', label: '客户等级', type: 'select', options: ['A - 明确需求+预算+决策链', 'B - 需求明确但预算不确定', 'C - 潜在需求长期培育', 'D - 不匹配'] },
     { key: 'sourceChannel', label: '客户来源渠道', type: 'text' },
+    { key: 'headcountEstimate', label: '预估测评人数', type: 'number' },
+    { key: 'decisionMaker', label: '决策人姓名/职位', type: 'text' },
     { key: 'goDecision', label: '准入决策', type: 'select', options: ['go - 全部维度通过', 'conditional - 需风险缓解', 'no-go - 暂不推进'] },
     { key: 'feasibilityNotes', label: '可行性评估备注', type: 'text', wide: true },
   ],
@@ -69,14 +29,21 @@ const STAGE_FIELDS: Record<ProjectState, FieldDef[]> = {
     { key: 'targetPopulation', label: '目标人群', type: 'text' },
     { key: 'budget', label: '预算范围', type: 'text' },
     { key: 'timeline', label: '期望交付时间', type: 'text' },
+    { key: 'assessmentTools', label: '测评工具清单', type: 'text', wide: true },
+    { key: 'techRequirements', label: '技术集成需求', type: 'text', wide: true },
   ],
   discovery: [
+    { key: 'contractNumber', label: '合同编号', type: 'text' },
     { key: 'contractAmount', label: '合同金额（元）', type: 'number' },
     { key: 'paymentTerms', label: '付款条款', type: 'text' },
-    { key: 'discountRate', label: '折扣率（%）', type: 'number' },
+    { key: 'depositAmount', label: '预付款金额（元）', type: 'number' },
+    { key: 'discountRate', label: '折扣率（%，100 = 不打折）', type: 'number' },
     { key: 'signedDate', label: '合同签署日期', type: 'text' },
+    { key: '_lawyerReviewConfirmed', label: '律师审核（合同 > 20 万时必填）', type: 'select', options: ['no - 未审核', 'yes - 已审核'], wide: true },
   ],
   contract: [
+    { key: 'participantCount', label: '实际参与人数', type: 'number' },
+    { key: 'assessmentStartDate', label: '测评开始日期', type: 'text' },
     { key: 'completionRate', label: '问卷完成率（%）', type: 'number' },
     { key: 'dataQualityStatus', label: '数据质量状态', type: 'select', options: ['pending - 待检查', 'pass - 通过', 'fail - 不通过'] },
     { key: 'milestonesNote', label: '里程碑进展备注', type: 'text', wide: true },
@@ -86,13 +53,19 @@ const STAGE_FIELDS: Record<ProjectState, FieldDef[]> = {
     { key: 'groupReportDone', label: '群体报告状态', type: 'select', options: ['pending - 待完成', 'done - 已完成'] },
     { key: 'deliveryMethod', label: '交付方式', type: 'select', options: ['平台在线', '邮件（加密）', '线下演示', '混合'] },
     { key: 'deliveryDate', label: '交付日期', type: 'text' },
+    { key: 'feedbackSummary', label: '初步客户反馈', type: 'text', wide: true },
   ],
   reporting: [
+    { key: 'invoiceNumber', label: '发票编号', type: 'text' },
+    { key: 'paymentDueDate', label: '约定付款到期日（YYYY-MM-DD）', type: 'text' },
+    { key: 'actualRevenue', label: '实际到账金额（元）', type: 'number' },
     { key: 'finalPaymentStatus', label: '尾款状态', type: 'select', options: ['pending - 待收款', 'partial - 部分到账', 'paid - 已全额到账'] },
     { key: 'npsScore', label: 'NPS 净推荐值（-100~100）', type: 'number' },
     { key: 'renewalStatus', label: '续约意向', type: 'select', options: ['pending - 待确认', 'yes - 有续约意向', 'no - 无续约意向'] },
   ],
-  closing: [],
+  closing: [
+    { key: 'closingNotes', label: '结案备注', type: 'text', wide: true },
+  ],
   done: [],
 };
 
@@ -206,6 +179,50 @@ export function StagePanel({ projectId, state, stageMeta, onMetaSaved }: StagePa
       <h2 style={{ margin: '0 0 1rem', fontSize: '0.9rem', fontWeight: 700, color: '#333' }}>
         {STAGE_TITLES[state]}
       </h2>
+
+      {/* Threshold alerts (discovery stage) */}
+      {state === 'discovery' && (() => {
+        const dr = typeof stageMeta.discountRate === 'number' ? stageMeta.discountRate : null;
+        const ca = typeof stageMeta.contractAmount === 'number' ? stageMeta.contractAmount : null;
+        const since = typeof stageMeta._discountCoolingSince === 'string' ? stageMeta._discountCoolingSince : null;
+        const alerts: React.ReactNode[] = [];
+
+        if (dr !== null && dr < 70) {
+          alerts.push(
+            <div key="dr-red" style={{ background: '#fff5f5', border: '1px solid #fca5a5', borderRadius: 6, padding: '0.5rem 0.75rem', fontSize: '0.8rem', color: '#b91c1c', marginBottom: '0.75rem' }}>
+              <strong>🚫 折扣红线：</strong>折扣率 {dr}% 低于 70% 最低阈值。请拆分为小额试单或拒绝本项目。
+            </div>
+          );
+        } else if (dr !== null && dr >= 70 && dr < 85) {
+          const elapsed = since ? Date.now() - new Date(since).getTime() : 0;
+          const remainMs = 24 * 3600 * 1000 - elapsed;
+          const remainHours = Math.ceil(remainMs / 3600000);
+          const cooled = since && remainMs <= 0;
+          alerts.push(
+            <div key="dr-yellow" style={{ background: cooled ? '#f0fdf4' : '#fffbeb', border: `1px solid ${cooled ? '#86efac' : '#fcd34d'}`, borderRadius: 6, padding: '0.5rem 0.75rem', fontSize: '0.8rem', color: cooled ? '#15803d' : '#92400e', marginBottom: '0.75rem' }}>
+              {cooled
+                ? <><strong>✓ 冷静期已满：</strong>折扣率 {dr}%，24h 冷静期已完成，可推进合同阶段。</>
+                : <><strong>⏳ 折扣冷静期：</strong>折扣率 {dr}%（70–84% 黄线），{since ? `还需约 ${remainHours} 小时` : '请保存阶段数据以启动 24h 计时'}。保存后请写入复盘原因。</>
+              }
+            </div>
+          );
+        }
+
+        if (ca !== null && ca > 200000) {
+          const reviewed = typeof stageMeta._lawyerReviewConfirmed === 'string'
+            ? stageMeta._lawyerReviewConfirmed
+            : '';
+          if (!reviewed.startsWith('yes')) {
+            alerts.push(
+              <div key="ca-lawyer" style={{ background: '#fffbeb', border: '1px solid #fcd34d', borderRadius: 6, padding: '0.5rem 0.75rem', fontSize: '0.8rem', color: '#92400e', marginBottom: '0.75rem' }}>
+                <strong>⚖️ 律师审核：</strong>合同金额 ¥{(ca / 10000).toFixed(1)}万 超过 20 万，须经一次性外部律师审核后在下方确认。
+              </div>
+            );
+          }
+        }
+
+        return alerts.length > 0 ? <div>{alerts}</div> : null;
+      })()}
 
       {/* Checklist */}
       {checklistDefs.length > 0 && (
