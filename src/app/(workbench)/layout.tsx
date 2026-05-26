@@ -9,7 +9,8 @@ export default async function WorkbenchLayout({
   children: React.ReactNode;
 }) {
   const session = await getServerSession(authOptions);
-  if (!session?.user) redirect('/api/auth/signin');
+  if (!session?.user) redirect('/login');
+  if ((session.user as any).mustChangePassword) redirect('/change-password');
 
   const role = (session.user as { role?: string }).role;
   const isContractor = role === 'contractor';

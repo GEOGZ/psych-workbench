@@ -12,3 +12,5 @@ export * from './verification-tokens';
 export * from './checklist';
 export * from './job-profiles';
 export * from './assessment-tools';
+export * from './project-reports';
+export * from './report-access-logs';

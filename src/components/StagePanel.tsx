@@ -229,9 +229,9 @@ export function StagePanel({ projectId, state, stageMeta, onMetaSaved }: StagePa
         <div style={{ marginBottom: fields.length > 0 ? '1.25rem' : 0 }}>
           <p style={sectionLabelStyle}>
             本阶段待办清单
-            {checklistComplete && (
-              <span style={{ marginLeft: 8, color: '#22c55e', fontWeight: 700 }}>✓ 全部完成</span>
-            )}
+            <span style={{ marginLeft: 8, fontWeight: 700, color: checklistComplete ? '#22c55e' : '#c00' }}>
+              {checklistComplete ? '✓ 全部完成' : `已完成 ${checklistDefs.filter(d => isChecked(d.key)).length} / 共 ${checklistDefs.length} 项`}
+            </span>
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
             {checklistDefs.map(({ key, label }) => {
@@ -245,7 +245,9 @@ export function StagePanel({ projectId, state, stageMeta, onMetaSaved }: StagePa
                     gap: '0.5rem',
                     cursor: 'pointer',
                     fontSize: '0.85rem',
-                    color: checked ? '#aaa' : '#333',
+                    color: checked ? '#aaa' : '#c00',
+                    borderLeft: checked ? '3px solid transparent' : '3px solid #fca5a5',
+                    paddingLeft: '0.4rem',
                   }}
                 >
                   <input

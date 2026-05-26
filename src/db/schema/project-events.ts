@@ -20,7 +20,8 @@ export const projectEventType = pgEnum('project_event_type', [
   'stage_meta_updated',
   'project_updated',
   'client_updated',
-  'monthly_retrospective'
+  'monthly_retrospective',
+  'report_uploaded'
 ]);
 
 export type ProjectEventType = (typeof projectEventType.enumValues)[number];

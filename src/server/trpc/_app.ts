@@ -8,6 +8,8 @@ import { grantsRouter } from './router/grants';
 import { usersRouter } from './router/users';
 import { jobProfilesRouter } from './router/job-profiles';
 import { assessmentToolsRouter } from './router/assessment-tools';
+import { authRouter } from './router/auth';
+import { reportsRouter } from './router/reports';
 
 export const appRouter = router({
   clients: clientsRouter,
@@ -19,6 +21,8 @@ export const appRouter = router({
   users: usersRouter,
   jobProfiles: jobProfilesRouter,
   assessmentTools: assessmentToolsRouter,
+  auth: authRouter,
+  reports: reportsRouter,
 });
 
 export type AppRouter = typeof appRouter;

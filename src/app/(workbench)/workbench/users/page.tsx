@@ -32,6 +32,8 @@ export default function UsersPage() {
   const setRoleMut       = trpc.users.setRole.useMutation({ onSuccess: () => refetch() });
   const updateProfileMut = trpc.users.updateProfile.useMutation({ onSuccess: () => { refetch(); setEditingId(null); } });
   const deleteMut        = trpc.users.delete.useMutation({ onSuccess: () => refetch() });
+  const setPasswordMut   = trpc.auth.setUserPassword.useMutation({ onSuccess: () => { setSetPwId(null); setSetPwValue(''); } });
+  const resetPasswordMut = trpc.auth.resetPassword.useMutation({ onSuccess: () => refetch() });
 
   const [inviteEmail,  setInviteEmail]  = useState('');
   const [inviteName,   setInviteName]   = useState('');
@@ -42,6 +44,8 @@ export default function UsersPage() {
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
   const [editingId,  setEditingId]  = useState<string | null>(null);
   const [editName,   setEditName]   = useState('');
+  const [setPwId,    setSetPwId]    = useState<string | null>(null);
+  const [setPwValue, setSetPwValue] = useState('');
 
   const inputStyle = {
     border: '1px solid #ddd', borderRadius: 5, padding: '0.4rem 0.6rem',
@@ -185,6 +189,29 @@ export default function UsersPage() {
                         </>
                       ) : (
                         <button onClick={() => setConfirmDeleteId(u.id)} style={{ padding: '0.3rem 0.5rem', borderRadius: 4, border: '1px solid #fca5a5', background: '#fff', color: '#c00', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>删除</button>
+                      )}
+                      {setPwId === u.id ? (
+                        <>
+                          <input
+                            type="password"
+                            value={setPwValue}
+                            onChange={e => setSetPwValue(e.target.value)}
+                            placeholder="新密码"
+                            autoFocus
+                            style={{ ...inputStyle, width: 110, padding: '0.25rem 0.4rem', fontSize: '0.75rem' }}
+                            onKeyDown={e => { if (e.key === 'Escape') { setSetPwId(null); setSetPwValue(''); } }}
+                          />
+                          <button
+                            onClick={() => setPasswordMut.mutate({ userId: u.id, newPassword: setPwValue })}
+                            disabled={setPasswordMut.isPending || !setPwValue}
+                            style={{ padding: '0.25rem 0.5rem', borderRadius: 4, border: 'none', background: '#4a4af0', color: '#fff', cursor: 'pointer', fontSize: '0.75rem' }}>✓</button>
+                          <button onClick={() => { setSetPwId(null); setSetPwValue(''); }} style={{ padding: '0.25rem 0.5rem', borderRadius: 4, border: '1px solid #ddd', background: '#fff', color: '#555', cursor: 'pointer', fontSize: '0.75rem' }}>✕</button>
+                        </>
+                      ) : (
+                        <>
+                          <button onClick={() => { setSetPwId(u.id); setSetPwValue(''); }} style={{ padding: '0.3rem 0.5rem', borderRadius: 4, border: '1px solid #c7c7f0', background: '#fff', color: '#4a4af0', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' as const }}>设置密码</button>
+                          <button onClick={() => resetPasswordMut.mutate({ userId: u.id })} disabled={resetPasswordMut.isPending} style={{ padding: '0.3rem 0.5rem', borderRadius: 4, border: '1px solid #fcd34d', background: '#fff', color: '#92400e', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' as const }}>重置密码</button>
+                        </>
                       )}
                     </div>
                   </td>

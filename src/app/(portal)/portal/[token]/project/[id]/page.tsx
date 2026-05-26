@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect } from 'react';
+import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { trpc } from '@/lib/trpc';
 import type { ProjectState } from '@/db/schema/projects';
@@ -36,6 +36,23 @@ export default function PortalProjectPage({ params }: { params: { token: string;
     { token, projectId: id },
     { enabled: !!project }
   );
+
+  const { data: reports = [] } = trpc.portal.listReports.useQuery(
+    { token, projectId: id },
+    { enabled: !!project }
+  );
+  const downloadReport = trpc.portal.downloadReport.useMutation();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
+
+  async function handleDownload(reportId: string) {
+    setDownloadingId(reportId);
+    try {
+      const { downloadUrl } = await downloadReport.mutateAsync({ token, reportId });
+      window.open(downloadUrl, '_blank', 'noopener,noreferrer');
+    } finally {
+      setDownloadingId(null);
+    }
+  }
 
   useEffect(() => {
     if (isError) router.replace('/portal/expired');
@@ -132,6 +149,33 @@ export default function PortalProjectPage({ params }: { params: { token: string;
           <div style={{ background: '#fff', borderRadius: 8, padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', marginBottom: '1rem' }}>
             <p style={{ margin: '0 0 0.4rem', fontSize: '0.7rem', fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>顾问备注</p>
             <p style={{ margin: 0, fontSize: '0.875rem', color: '#444', lineHeight: 1.6 }}>{project.notes}</p>
+          </div>
+        )}
+
+        {/* Reports */}
+        {reports.length > 0 && (
+          <div style={{ background: '#fff', borderRadius: 8, padding: '1.25rem', boxShadow: '0 1px 4px rgba(0,0,0,0.07)', marginBottom: '1rem' }}>
+            <p style={{ margin: '0 0 0.75rem', fontSize: '0.7rem', fontWeight: 600, color: '#888', textTransform: 'uppercase', letterSpacing: '0.05em' }}>项目报告</p>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: '0.4rem' }}>
+              {reports.map(r => (
+                <div key={r.id} style={{ display: 'flex', alignItems: 'center', gap: '0.6rem', background: '#f8f8fc', borderRadius: 6, padding: '0.5rem 0.75rem', fontSize: '0.82rem' }}>
+                  <span style={{ fontSize: '0.7rem', padding: '0.1rem 0.4rem', borderRadius: 10, background: '#e8e8fd', color: '#4a4af0', fontWeight: 600, flexShrink: 0 }}>
+                    {r.fileType.toUpperCase()}
+                  </span>
+                  <span style={{ flex: 1, fontWeight: 500, color: '#333', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{r.title}</span>
+                  <span style={{ color: '#aaa', fontSize: '0.75rem', whiteSpace: 'nowrap', flexShrink: 0 }}>
+                    {new Date(r.uploadedAt).toLocaleDateString('zh-CN')}
+                  </span>
+                  <button
+                    onClick={() => handleDownload(r.id)}
+                    disabled={downloadingId === r.id}
+                    style={{ padding: '0.2rem 0.6rem', borderRadius: 4, border: '1px solid #c7c7f0', background: '#fff', color: '#4a4af0', cursor: downloadingId === r.id ? 'not-allowed' : 'pointer', fontSize: '0.75rem', fontWeight: 600, whiteSpace: 'nowrap', opacity: downloadingId === r.id ? 0.6 : 1, flexShrink: 0 }}
+                  >
+                    {downloadingId === r.id ? '…' : '下载'}
+                  </button>
+                </div>
+              ))}
+            </div>
           </div>
         )}
 

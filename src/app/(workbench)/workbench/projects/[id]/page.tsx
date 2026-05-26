@@ -8,6 +8,7 @@ import { AdvanceProjectButton } from '@/components/AdvanceProjectButton';
 import { StagePanel } from '@/components/StagePanel';
 import { EventTimeline } from '@/components/EventTimeline';
 import { MonthlyRetrospectivePanel } from '@/components/MonthlyRetrospectivePanel';
+import { ReportCard } from '@/components/ReportCard';
 import { generateProjectCsv, downloadCsv } from '@/lib/export-project-csv';
 import { CHECKLIST_KEYS } from '@/lib/checklist-defs';
 import type { ProjectState } from '@/db/schema/projects';
@@ -365,6 +366,8 @@ export default function ProjectDetailPage({ params }: { params: { id: string } }
           </button>
         </div>
       </div>
+
+      <ReportCard projectId={project.id} />
 
       <MonthlyRetrospectivePanel projectId={project.id} />
 

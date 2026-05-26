@@ -7,8 +7,11 @@ import { clientPortalTokens } from '@/db/schema/client-portal-tokens';
 import { projects } from '@/db/schema/projects';
 import { clients } from '@/db/schema/clients';
 import { projectChecklistItems } from '@/db/schema/checklist';
+import { projectReports } from '@/db/schema/project-reports';
+import { reportAccessLogs } from '@/db/schema/report-access-logs';
 import { randomBytes } from 'crypto';
 import { mailer } from '@/server/email/mailer';
+import { generateDownloadUrl } from '@/lib/oss';
 import type { DbClient } from '@/db';
 
 const TOKEN_BYTES = 32;
@@ -264,5 +267,44 @@ export const portalRouter = router({
       });
 
       return { ok: true };
+    }),
+
+  listReports: publicProcedure
+    .input(z.object({ token: z.string(), projectId: z.string().uuid() }))
+    .query(async ({ input, ctx }) => {
+      const tokenRow = await requireValidToken(ctx.db, input.token);
+      const project = await ctx.db.query.projects.findFirst({
+        where: and(eq(projects.id, input.projectId), eq(projects.clientId, tokenRow.clientId)),
+        columns: { id: true },
+      });
+      if (!project) throw new TRPCError({ code: 'NOT_FOUND' });
+      const reports = await ctx.db.query.projectReports.findMany({
+        where: and(eq(projectReports.projectId, input.projectId), eq(projectReports.visibleToPortal, true)),
+        columns: { id: true, title: true, fileType: true, fileSize: true, uploadedAt: true, fileKey: true },
+      });
+      return reports;
+    }),
+
+  downloadReport: publicProcedure
+    .input(z.object({ token: z.string(), reportId: z.string().uuid() }))
+    .mutation(async ({ input, ctx }) => {
+      const tokenRow = await requireValidToken(ctx.db, input.token);
+      const report = await ctx.db.query.projectReports.findFirst({
+        where: and(eq(projectReports.id, input.reportId), eq(projectReports.visibleToPortal, true)),
+        columns: { id: true, fileKey: true, projectId: true },
+      });
+      if (!report) throw new TRPCError({ code: 'NOT_FOUND' });
+      const project = await ctx.db.query.projects.findFirst({
+        where: and(eq(projects.id, report.projectId), eq(projects.clientId, tokenRow.clientId)),
+        columns: { id: true },
+      });
+      if (!project) throw new TRPCError({ code: 'FORBIDDEN' });
+      await ctx.db.insert(reportAccessLogs).values({
+        reportId: input.reportId,
+        actorType: 'portal',
+        portalTokenId: tokenRow.id,
+        action: 'download',
+      });
+      return { downloadUrl: generateDownloadUrl(report.fileKey) };
     }),
 });

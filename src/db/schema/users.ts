@@ -1,4 +1,4 @@
-import { pgTable, pgEnum, uuid, text, timestamp } from 'drizzle-orm/pg-core';
+import { pgTable, pgEnum, uuid, text, boolean, timestamp } from 'drizzle-orm/pg-core';
 
 export const userRole = pgEnum('user_role', ['owner', 'admin', 'contractor']);
 
@@ -13,6 +13,8 @@ export const users = pgTable('users', {
   role: userRole('role').notNull(),
   invitedByUserId: uuid('invited_by_user_id').references((): any => users.id),
   lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
+  passwordHash: text('password_hash'),
+  mustChangePassword: boolean('must_change_password').notNull().default(false),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });
