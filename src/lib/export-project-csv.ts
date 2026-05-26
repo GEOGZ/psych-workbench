@@ -184,8 +184,8 @@ export function generateProjectCsv(data: ProjectReportData): string {
     lines.push(row('联系人', client.contactName));
     lines.push(row('联系邮箱', client.contactEmail ?? ''));
     lines.push(row('联系电话', client.contactPhone ?? ''));
-    lines.push(row('危机联系人', client.crisisContactName));
-    lines.push(row('危机联系电话', client.crisisContactPhone));
+    lines.push(row('紧急联系人', client.crisisContactName));
+    lines.push(row('紧急联系电话', client.crisisContactPhone));
     lines.push(row('客户备注', client.notes ?? ''));
   } else {
     lines.push(row('（客户数据不可用）', ''));

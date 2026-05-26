@@ -12,18 +12,18 @@ export const usersRouter = router({
     .use(ownerOnly)
     .query(({ ctx }) =>
       ctx.db.query.users.findMany({
-        columns: { id: true, name: true, email: true, role: true, createdAt: true },
+        columns: { id: true, name: true, email: true, role: true, createdAt: true, lastLoginAt: true },
         orderBy: (u, { asc }) => [asc(u.createdAt)]
       })
     ),
 
-  /**
-   * Pre-create a user so they sign in with the correct role via magic link.
-   * If the email already exists, updates their role instead.
-   */
   invite: protectedProcedure
     .use(ownerOnly)
-    .input(z.object({ email: z.string().email(), role: roleSchema }))
+    .input(z.object({
+      email: z.string().email(),
+      role: roleSchema,
+      name: z.string().min(1).optional(),
+    }))
     .mutation(async ({ input, ctx }) => {
       const existing = await ctx.db.query.users.findFirst({
         where: eq(users.email, input.email),
@@ -31,9 +31,11 @@ export const usersRouter = router({
       });
 
       if (existing) {
+        const updateData: Record<string, unknown> = { role: input.role };
+        if (input.name) updateData.name = input.name.trim();
         const [row] = await ctx.db
           .update(users)
-          .set({ role: input.role })
+          .set(updateData)
           .where(eq(users.id, existing.id))
           .returning({ id: users.id, email: users.email, role: users.role });
         return { action: 'updated' as const, user: row };
@@ -41,9 +43,30 @@ export const usersRouter = router({
 
       const [row] = await ctx.db
         .insert(users)
-        .values({ email: input.email, role: input.role, invitedByUserId: ctx.user.id })
+        .values({
+          email: input.email,
+          role: input.role,
+          name: input.name?.trim() ?? null,
+          invitedByUserId: ctx.user.id,
+        })
         .returning({ id: users.id, email: users.email, role: users.role });
       return { action: 'created' as const, user: row };
+    }),
+
+  updateProfile: protectedProcedure
+    .use(ownerOnly)
+    .input(z.object({
+      userId: z.string().uuid(),
+      name: z.string().min(1, '姓名不能为空'),
+    }))
+    .mutation(async ({ input, ctx }) => {
+      const [row] = await ctx.db
+        .update(users)
+        .set({ name: input.name.trim() })
+        .where(eq(users.id, input.userId))
+        .returning({ id: users.id, name: users.name });
+      if (!row) throw new TRPCError({ code: 'NOT_FOUND' });
+      return row;
     }),
 
   setRole: protectedProcedure

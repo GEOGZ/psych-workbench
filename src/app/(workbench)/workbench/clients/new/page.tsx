@@ -64,11 +64,11 @@ export default function NewClientPage() {
 
         <div style={{ borderTop: '1px solid #f0f0f8', paddingTop: '0.75rem' }}>
           <p style={{ margin: '0 0 0.5rem', fontSize: '0.8rem', color: '#c00', fontWeight: 600 }}>
-            危机联系人（必填，§4.3 安全规范）
+            紧急联系人（必填，§4.3 安全规范）
           </p>
           <div style={{ display: 'flex', flexDirection: 'column', gap: '0.75rem' }}>
-            <Field label="危机联系人姓名" field="crisisContactName" required />
-            <Field label="危机联系人电话" field="crisisContactPhone" required />
+            <Field label="紧急联系人姓名" field="crisisContactName" required />
+            <Field label="紧急联系电话" field="crisisContactPhone" required />
           </div>
         </div>
 

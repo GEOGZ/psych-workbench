@@ -79,8 +79,8 @@ export const clientsRouter = router({
         contactName: z.string().min(1),
         contactEmail: z.string().email().optional(),
         contactPhone: z.string().optional(),
-        crisisContactName: z.string().min(1, '危机联系人姓名必填'),
-        crisisContactPhone: z.string().min(1, '危机联系人电话必填'),
+        crisisContactName: z.string().min(1, '紧急联系人姓名必填'),
+        crisisContactPhone: z.string().min(1, '紧急联系电话必填'),
         notes: z.string().optional()
       })
     )

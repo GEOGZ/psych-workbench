@@ -197,8 +197,8 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
               ['联系人 *', eContactName, setEContactName, 'text', true],
               ['联系邮箱', eContactEmail, setEContactEmail, 'email', false],
               ['联系电话', eContactPhone, setEContactPhone, 'text', false],
-              ['危机联系人 *', eCrisisName, setECrisisName, 'text', true],
-              ['危机电话 *', eCrisisPhone, setECrisisPhone, 'text', true],
+              ['紧急联系人 *', eCrisisName, setECrisisName, 'text', true],
+              ['紧急联系电话 *', eCrisisPhone, setECrisisPhone, 'text', true],
             ] as [string, string, (v: string) => void, string, boolean][]).map(([label, val, setter, type, req]) => (
               <div key={label}>
                 <label style={{ fontSize: '0.75rem', color: '#555', display: 'block', marginBottom: '0.2rem', fontWeight: 500 }}>{label}</label>
@@ -233,9 +233,9 @@ export default function ClientDetailPage({ params }: { params: { id: string } })
             <dd style={{ margin: 0 }}>{client.contactEmail ?? '—'}</dd>
             <dt style={{ color: '#888', fontWeight: 500 }}>联系电话</dt>
             <dd style={{ margin: 0 }}>{client.contactPhone ?? '—'}</dd>
-            <dt style={{ color: '#888', fontWeight: 500 }}>危机联系人</dt>
+            <dt style={{ color: '#888', fontWeight: 500 }}>紧急联系人</dt>
             <dd style={{ margin: 0, color: '#065f46', fontWeight: 500 }}>{client.crisisContactName}</dd>
-            <dt style={{ color: '#888', fontWeight: 500 }}>危机电话</dt>
+            <dt style={{ color: '#888', fontWeight: 500 }}>紧急联系电话</dt>
             <dd style={{ margin: 0 }}>{client.crisisContactPhone}</dd>
             {client.notes && (
               <>

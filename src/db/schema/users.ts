@@ -12,6 +12,7 @@ export const users = pgTable('users', {
   image: text('image'),
   role: userRole('role').notNull(),
   invitedByUserId: uuid('invited_by_user_id').references((): any => users.id),
+  lastLoginAt: timestamp('last_login_at', { withTimezone: true }),
   createdAt: timestamp('created_at', { withTimezone: true }).notNull().defaultNow(),
   updatedAt: timestamp('updated_at', { withTimezone: true }).notNull().defaultNow()
 });

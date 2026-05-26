@@ -2,6 +2,8 @@ import type { NextAuthOptions } from 'next-auth';
 import EmailProvider from 'next-auth/providers/email';
 import { createDrizzleAdapter } from './adapter';
 import { db } from '@/db';
+import { eq } from 'drizzle-orm';
+import { users } from '@/db/schema/users';
 
 export const authOptions: NextAuthOptions = {
   adapter: createDrizzleAdapter(db),
@@ -21,8 +23,8 @@ export const authOptions: NextAuthOptions = {
   ],
   session: {
     strategy: 'database',
-    maxAge: 30 * 24 * 60 * 60, // 30 days
-    updateAge: 24 * 60 * 60, // 24 hours
+    maxAge: 30 * 24 * 60 * 60,
+    updateAge: 24 * 60 * 60,
   },
   callbacks: {
     async session({ session, user }) {
@@ -31,6 +33,15 @@ export const authOptions: NextAuthOptions = {
         (session.user as any).role = (user as any).role;
       }
       return session;
+    },
+  },
+  events: {
+    async signIn({ user }) {
+      if (user.id) {
+        await db.update(users)
+          .set({ lastLoginAt: new Date() })
+          .where(eq(users.id, user.id));
+      }
     },
   },
 };
