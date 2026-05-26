@@ -253,6 +253,24 @@ export const projectsRelations = relations(projects, ({ one, many }) => ({
 - 数据量 > 10GB 或并发 > 100 时迁移至 PostgreSQL
 - Drizzle ORM 支持 SQLite → PostgreSQL 无缝迁移
 
+> **实际已实现（PostgreSQL / Neon）**：上述为设计期草图。当前生产 schema 基于 PostgreSQL，核心表如下：
+>
+> | 表 | 关键字段 |
+> |----|---------|
+> | `users` | `id`, `email`, `name`, `role (enum: owner/admin/contractor)`, `invited_by_user_id`, `last_login_at`, `created_at`, `updated_at` |
+> | `clients` | `id`, `name`, `contact_name`, `contact_email`, `contact_phone`, `crisis_contact_name`, `crisis_contact_phone`, `notes`, `created_at` |
+> | `projects` | `id`, `client_id`, `title`, `state`, `stage_meta (jsonb)`, `created_at`, `updated_at` |
+> | `sessions` / `verification_tokens` | NextAuth 数据库会话表 |
+>
+> **用户管理 tRPC 端点**（`src/server/trpc/router/users.ts`，仅 owner 可调用）：
+> - `users.list` — 列出所有用户，含 `lastLoginAt`
+> - `users.invite` — 预设账号（姓名必填）；邮箱已存在时更新信息
+> - `users.updateProfile` — 按 userId 修改姓名（内联编辑）
+> - `users.setRole` — 修改角色（不可修改自己）
+> - `users.delete` — 删除用户（不可删除自己）
+>
+> 每次登录通过 NextAuth `events.signIn` 回调自动更新 `last_login_at`。
+
 ### 3.3 报告生成引擎
 
 ```
