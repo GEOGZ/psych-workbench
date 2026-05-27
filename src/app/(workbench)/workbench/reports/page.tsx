@@ -14,8 +14,8 @@ function fmtMoney(v: number) {
   return `¥${v.toLocaleString('zh-CN')}`;
 }
 
-function monthLabel(iso: string) {
-  return iso.slice(0, 7);
+function monthLabel(d: Date | string) {
+  return new Date(d).toISOString().slice(0, 7);
 }
 
 export default function ReportsPage() {
@@ -28,9 +28,9 @@ export default function ReportsPage() {
     const meta = (p.stageMeta ?? {}) as Meta;
     return {
       id: p.id,
-      title: (p as Meta).title as string,
+      title: p.title,
       state: p.state,
-      month: monthLabel((p as Meta).createdAt as string),
+      month: monthLabel(p.createdAt),
       contractAmount: typeof meta.contractAmount === 'number' ? meta.contractAmount : 0,
       actualRevenue: typeof meta.actualRevenue === 'number' ? meta.actualRevenue : 0,
       npsScore: typeof meta.npsScore === 'number' ? (meta.npsScore as number) : null,
