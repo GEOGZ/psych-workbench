@@ -1,11 +1,36 @@
 # 技术架构建议书
 
 > **文档编号**：TA-2024-001  
-> **版本**：v1.0.0-draft  
-> **日期**：2024-01-15  
+> **版本**：v1.3.0  
+> **日期**：2026-05-30  
 > **编写**：大马 🐴  
 > **目标读者**：技术负责人、Claude Code 开发者、架构评审委员会  
 > **关联文档**：[PRD.md](./PRD.md) | [客户旅程地图](./customer-journey.md) | [全景SOP](./00-全景SOP.md)
+
+---
+
+## 零、域名与入口架构（v1.3 新增）
+
+| 域名 | 用途 | 部署 |
+|------|------|------|
+| `www.wisepsy.cn` | 品牌官网（对外展示、落地页） | 独立站 / 静态托管 |
+| `app.wisepsy.cn` | 运营系统 / 工作台（本系统） | Vercel（Next.js） |
+| `app.wisepsy.cn/portal/[token]` | 客户门户（token 鉴权，只读） | 同上 |
+
+**入口关系：**
+
+```
+www.wisepsy.cn（官网）
+  └── 运营系统入口按钮 → app.wisepsy.cn/login
+
+app.wisepsy.cn/login（登录页）
+  └── "返回官网" 链接 → www.wisepsy.cn
+
+app.wisepsy.cn/workbench（工作台导航）
+  └── "WisePsy" 品牌名 → www.wisepsy.cn（新标签页）
+```
+
+> **原则**：官网和运营系统独立部署，互不依赖；官网通过超链接引导用户进入运营系统，运营系统始终保留返回官网的出口。
 
 ---
 

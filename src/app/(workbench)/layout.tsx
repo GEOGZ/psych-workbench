@@ -18,7 +18,12 @@ export default async function WorkbenchLayout({
   return (
     <div style={{ display: 'flex', flexDirection: 'column', minHeight: '100vh', fontFamily: 'system-ui, sans-serif' }}>
       <nav style={{ background: '#1a1a2e', color: '#e8e8f0', padding: '0.75rem 1.5rem', display: 'flex', alignItems: 'center', gap: '1.5rem', flexWrap: 'wrap' }}>
-        <span style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '0.02em' }}>工作台</span>
+        <a href="https://www.wisepsy.cn" target="_blank" rel="noopener noreferrer"
+          style={{ fontWeight: 700, fontSize: '1rem', letterSpacing: '0.02em', color: '#e8e8f0', textDecoration: 'none' }}
+          title="返回 wisepsy.cn 官网">
+          WisePsy
+        </a>
+        <span style={{ color: '#4040a0', fontSize: '0.75rem', marginLeft: '-0.75rem' }}>运营系统</span>
         {isContractor ? (
           <a href="/workbench/contractor" style={{ color: '#a0a0c0', textDecoration: 'none', fontSize: '0.875rem' }}>我的项目</a>
         ) : (

@@ -176,6 +176,14 @@ export default function LoginPage() {
             </button>
           </div>
         )}
+
+        {/* Back to main site */}
+        <div style={{ marginTop: '1.5rem', borderTop: '1px solid #f0f0f0', paddingTop: '1rem', textAlign: 'center' }}>
+          <a href="https://www.wisepsy.cn" style={{ fontSize: '0.78rem', color: '#aaa', textDecoration: 'none' }}
+            target="_blank" rel="noopener noreferrer">
+            ← 返回 wisepsy.cn 官网
+          </a>
+        </div>
       </div>
     </div>
   );
