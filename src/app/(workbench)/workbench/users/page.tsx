@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { trpc } from '@/lib/trpc';
 
 const ROLE_ZH: Record<string, string> = {
@@ -16,6 +16,44 @@ const PAGE_SIZE = 20;
 function fmtDate(d: string | Date | null | undefined) {
   if (!d) return '—';
   return new Date(d).toLocaleDateString('zh-CN', { year: 'numeric', month: '2-digit', day: '2-digit' });
+}
+
+/** Compact "⋯" dropdown for per-row actions */
+function ActionMenu({ children }: { children: React.ReactNode }) {
+  const [open, setOpen] = useState(false);
+  const ref = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function handler(e: MouseEvent) {
+      if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false);
+    }
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
+
+  return (
+    <div ref={ref} style={{ position: 'relative', display: 'inline-block' }}>
+      <button onClick={() => setOpen(o => !o)}
+        style={{ padding: '0.3rem 0.55rem', borderRadius: 5, border: '1px solid #ddd', background: '#fff', cursor: 'pointer', fontSize: '1rem', lineHeight: 1, color: '#555' }}>
+        ⋯
+      </button>
+      {open && (
+        <div onClick={() => setOpen(false)}
+          style={{ position: 'absolute', right: 0, top: 'calc(100% + 4px)', background: '#fff', borderRadius: 7, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', border: '1px solid #eee', minWidth: 160, zIndex: 200, padding: '0.35rem 0' }}>
+          {children}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MenuItem({ label, onClick, danger, disabled }: { label: string; onClick: () => void; danger?: boolean; disabled?: boolean }) {
+  return (
+    <button onClick={onClick} disabled={disabled}
+      style={{ display: 'block', width: '100%', textAlign: 'left', padding: '0.45rem 0.9rem', border: 'none', background: 'none', cursor: disabled ? 'not-allowed' : 'pointer', fontSize: '0.82rem', color: danger ? '#dc2626' : '#333', opacity: disabled ? 0.5 : 1 }}>
+      {label}
+    </button>
+  );
 }
 
 export default function UsersPage() {
@@ -60,7 +98,7 @@ export default function UsersPage() {
   }
 
   return (
-    <div style={{ maxWidth: 900 }}>
+    <div style={{ maxWidth: 980 }}>
       <h1 style={{ margin: '0 0 1.25rem', fontSize: '1.1rem', fontWeight: 700 }}>用户管理</h1>
 
       {/* ── Invite form ── */}
@@ -99,12 +137,12 @@ export default function UsersPage() {
       </div>
 
       {/* ── Users table ── */}
-      <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflow: 'hidden' }}>
-        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem' }}>
+      <div style={{ background: '#fff', borderRadius: 8, boxShadow: '0 1px 4px rgba(0,0,0,0.07)', overflowX: 'auto' }}>
+        <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: '0.875rem', minWidth: 700 }}>
           <thead>
             <tr style={{ background: '#f5f5fa' }}>
-              {['姓名', '邮箱', '角色', '上次登录', '操作'].map((h, i) => (
-                <th key={h} style={{ textAlign: 'left', padding: '0.65rem 1rem', fontWeight: 600, color: '#555', fontSize: '0.78rem', whiteSpace: 'nowrap', width: i === 4 ? 260 : undefined }}>
+              {['姓名', '邮箱', '角色', '上次登录', '创建时间', '操作'].map(h => (
+                <th key={h} style={{ textAlign: 'left', padding: '0.65rem 0.85rem', fontWeight: 600, color: '#555', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>
                   {h}
                 </th>
               ))}
@@ -112,7 +150,7 @@ export default function UsersPage() {
           </thead>
           <tbody>
             {users.length === 0 && (
-              <tr><td colSpan={5} style={{ padding: '1.5rem', color: '#aaa', textAlign: 'center' }}>暂无用户</td></tr>
+              <tr><td colSpan={6} style={{ padding: '1.5rem', color: '#aaa', textAlign: 'center' }}>暂无用户</td></tr>
             )}
             {paged.map((u, i) => {
               const rc = ROLE_COLOR[u.role] ?? { bg: '#f3f4f6', color: '#374151' };
@@ -121,16 +159,16 @@ export default function UsersPage() {
                 <tr key={u.id} style={{ borderTop: i === 0 ? undefined : '1px solid #f0f0f5' }}>
 
                   {/* 姓名 */}
-                  <td style={{ padding: '0.65rem 1rem', minWidth: 100 }}>
+                  <td style={{ padding: '0.65rem 0.85rem', minWidth: 90 }}>
                     {isEditing ? (
                       <div style={{ display: 'flex', gap: '0.3rem' }}>
                         <input value={editName} onChange={e => setEditName(e.target.value)} autoFocus
-                          style={{ ...inp, width: 90, padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
+                          style={{ ...inp, width: 88, padding: '0.25rem 0.4rem', fontSize: '0.8rem' }}
                           onKeyDown={e => { if (e.key === 'Enter') updateProfileMut.mutate({ userId: u.id, name: editName.trim() }); if (e.key === 'Escape') setEditingId(null); }} />
                         <button onClick={() => updateProfileMut.mutate({ userId: u.id, name: editName.trim() })} disabled={updateProfileMut.isPending || !editName.trim()}
-                          style={{ padding: '0.25rem 0.45rem', borderRadius: 4, border: 'none', background: '#4a4af0', color: '#fff', cursor: 'pointer', fontSize: '0.75rem' }}>✓</button>
+                          style={{ padding: '0.25rem 0.4rem', borderRadius: 4, border: 'none', background: '#4a4af0', color: '#fff', cursor: 'pointer', fontSize: '0.75rem' }}>✓</button>
                         <button onClick={() => setEditingId(null)}
-                          style={{ padding: '0.25rem 0.45rem', borderRadius: 4, border: '1px solid #ddd', background: '#fff', color: '#555', cursor: 'pointer', fontSize: '0.75rem' }}>✕</button>
+                          style={{ padding: '0.25rem 0.4rem', borderRadius: 4, border: '1px solid #ddd', background: '#fff', color: '#555', cursor: 'pointer', fontSize: '0.75rem' }}>✕</button>
                       </div>
                     ) : (
                       <span onClick={() => { setEditingId(u.id); setEditName(u.name ?? ''); }} title="点击编辑姓名"
@@ -141,24 +179,26 @@ export default function UsersPage() {
                   </td>
 
                   {/* 邮箱 */}
-                  <td style={{ padding: '0.65rem 1rem', color: '#555', fontSize: '0.85rem', maxWidth: 220, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                  <td style={{ padding: '0.65rem 0.85rem', color: '#555', fontSize: '0.82rem', maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
                     {u.email}
                   </td>
 
                   {/* 角色 badge */}
-                  <td style={{ padding: '0.65rem 1rem', whiteSpace: 'nowrap' }}>
-                    <span style={{ fontSize: '0.75rem', padding: '0.2rem 0.6rem', borderRadius: 20, background: rc.bg, color: rc.color, fontWeight: 600 }}>
+                  <td style={{ padding: '0.65rem 0.85rem', whiteSpace: 'nowrap' }}>
+                    <span style={{ fontSize: '0.73rem', padding: '0.18rem 0.55rem', borderRadius: 20, background: rc.bg, color: rc.color, fontWeight: 600 }}>
                       {ROLE_ZH[u.role] ?? u.role}
                     </span>
                   </td>
 
                   {/* 上次登录 */}
-                  <td style={{ padding: '0.65rem 1rem', color: '#888', fontSize: '0.8rem', whiteSpace: 'nowrap' }}>{fmtDate(u.lastLoginAt)}</td>
+                  <td style={{ padding: '0.65rem 0.85rem', color: '#888', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{fmtDate(u.lastLoginAt)}</td>
 
-                  {/* 操作 — 两行 */}
-                  <td style={{ padding: '0.5rem 1rem' }}>
-                    {/* 行1：角色变更 + 删除 */}
-                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center', marginBottom: '0.35rem' }}>
+                  {/* 创建时间 */}
+                  <td style={{ padding: '0.65rem 0.85rem', color: '#aaa', fontSize: '0.78rem', whiteSpace: 'nowrap' }}>{fmtDate(u.createdAt)}</td>
+
+                  {/* 操作：角色下拉 + ⋯ 菜单 */}
+                  <td style={{ padding: '0.5rem 0.85rem', whiteSpace: 'nowrap' }}>
+                    <div style={{ display: 'flex', gap: '0.4rem', alignItems: 'center' }}>
                       <select defaultValue={u.role}
                         onChange={e => { const r = e.target.value as 'owner'|'admin'|'contractor'; if (r !== u.role) setRoleMut.mutate({ userId: u.id, role: r }); }}
                         style={{ ...inp, fontSize: '0.78rem', padding: '0.25rem 0.4rem' }}>
@@ -166,40 +206,38 @@ export default function UsersPage() {
                         <option value="admin">管理员</option>
                         <option value="owner">所有者</option>
                       </select>
-                      {confirmDeleteId === u.id ? (
-                        <>
-                          <button onClick={() => deleteMut.mutate({ userId: u.id }, { onSuccess: () => setConfirmDeleteId(null) })} disabled={deleteMut.isPending}
-                            style={{ padding: '0.25rem 0.5rem', borderRadius: 4, background: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>确认删除</button>
-                          <button onClick={() => setConfirmDeleteId(null)}
-                            style={{ padding: '0.25rem 0.5rem', borderRadius: 4, background: '#fff', color: '#555', border: '1px solid #ddd', cursor: 'pointer', fontSize: '0.75rem' }}>取消</button>
-                        </>
-                      ) : (
-                        <button onClick={() => setConfirmDeleteId(u.id)}
-                          style={{ padding: '0.25rem 0.5rem', borderRadius: 4, border: '1px solid #fca5a5', background: '#fff', color: '#c00', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>删除</button>
-                      )}
-                    </div>
 
-                    {/* 行2：密码管理 */}
-                    {setPwId === u.id ? (
-                      <div style={{ display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
-                        <input type="password" value={setPwValue} onChange={e => setSetPwValue(e.target.value)}
-                          placeholder="新密码" autoFocus
-                          style={{ ...inp, width: 120, padding: '0.25rem 0.4rem', fontSize: '0.78rem' }}
-                          onKeyDown={e => { if (e.key === 'Escape') { setSetPwId(null); setSetPwValue(''); } }} />
-                        <button onClick={() => setPasswordMut.mutate({ userId: u.id, newPassword: setPwValue })}
-                          disabled={setPasswordMut.isPending || !setPwValue}
-                          style={{ padding: '0.25rem 0.45rem', borderRadius: 4, border: 'none', background: '#4a4af0', color: '#fff', cursor: 'pointer', fontSize: '0.75rem' }}>✓</button>
-                        <button onClick={() => { setSetPwId(null); setSetPwValue(''); }}
-                          style={{ padding: '0.25rem 0.45rem', borderRadius: 4, border: '1px solid #ddd', background: '#fff', color: '#555', cursor: 'pointer', fontSize: '0.75rem' }}>✕</button>
-                      </div>
-                    ) : (
-                      <div style={{ display: 'flex', gap: '0.4rem' }}>
-                        <button onClick={() => { setSetPwId(u.id); setSetPwValue(''); }}
-                          style={{ padding: '0.25rem 0.55rem', borderRadius: 4, border: '1px solid #c7c7f0', background: '#fff', color: '#4a4af0', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>设置密码</button>
-                        <button onClick={() => resetPasswordMut.mutate({ userId: u.id })} disabled={resetPasswordMut.isPending}
-                          style={{ padding: '0.25rem 0.55rem', borderRadius: 4, border: '1px solid #fcd34d', background: '#fff', color: '#92400e', cursor: 'pointer', fontSize: '0.75rem', whiteSpace: 'nowrap' }}>重置密码</button>
-                      </div>
-                    )}
+                      <ActionMenu>
+                        {/* 设置密码 */}
+                        {setPwId === u.id ? (
+                          <div style={{ padding: '0.45rem 0.9rem', display: 'flex', gap: '0.3rem', alignItems: 'center' }}>
+                            <input type="password" value={setPwValue} onChange={e => setSetPwValue(e.target.value)}
+                              placeholder="新密码" autoFocus
+                              style={{ ...inp, width: 110, padding: '0.25rem 0.4rem', fontSize: '0.78rem' }}
+                              onKeyDown={e => { if (e.key === 'Escape') { setSetPwId(null); setSetPwValue(''); } }} />
+                            <button onClick={() => setPasswordMut.mutate({ userId: u.id, newPassword: setPwValue })}
+                              disabled={setPasswordMut.isPending || !setPwValue}
+                              style={{ padding: '0.25rem 0.4rem', borderRadius: 4, border: 'none', background: '#4a4af0', color: '#fff', cursor: 'pointer', fontSize: '0.75rem' }}>✓</button>
+                            <button onClick={() => { setSetPwId(null); setSetPwValue(''); }}
+                              style={{ padding: '0.25rem 0.4rem', borderRadius: 4, border: '1px solid #ddd', background: '#fff', color: '#555', cursor: 'pointer', fontSize: '0.75rem' }}>✕</button>
+                          </div>
+                        ) : (
+                          <MenuItem label="设置密码" onClick={() => { setSetPwId(u.id); setSetPwValue(''); }} />
+                        )}
+                        <MenuItem label="重置密码（强制改密）" onClick={() => resetPasswordMut.mutate({ userId: u.id })} disabled={resetPasswordMut.isPending} />
+                        <div style={{ borderTop: '1px solid #f0f0f0', margin: '0.2rem 0' }} />
+                        {confirmDeleteId === u.id ? (
+                          <div style={{ padding: '0.45rem 0.9rem', display: 'flex', gap: '0.4rem' }}>
+                            <button onClick={() => deleteMut.mutate({ userId: u.id }, { onSuccess: () => setConfirmDeleteId(null) })} disabled={deleteMut.isPending}
+                              style={{ padding: '0.25rem 0.5rem', borderRadius: 4, background: '#dc2626', color: '#fff', border: 'none', cursor: 'pointer', fontSize: '0.75rem', fontWeight: 600 }}>确认删除</button>
+                            <button onClick={() => setConfirmDeleteId(null)}
+                              style={{ padding: '0.25rem 0.5rem', borderRadius: 4, background: '#fff', color: '#555', border: '1px solid #ddd', cursor: 'pointer', fontSize: '0.75rem' }}>取消</button>
+                          </div>
+                        ) : (
+                          <MenuItem label="删除用户" onClick={() => setConfirmDeleteId(u.id)} danger />
+                        )}
+                      </ActionMenu>
+                    </div>
                   </td>
                 </tr>
               );
