@@ -22,8 +22,7 @@ export const authOptions: NextAuthOptions = {
           where: eq(users.email, credentials.email.toLowerCase().trim()),
           columns: { id: true, email: true, name: true, role: true, passwordHash: true, mustChangePassword: true },
         });
-        if (!user) return null;
-        if (!user.passwordHash) return null;
+        if (!user || !user.passwordHash) return null;
         const ok = await verifyPassword(credentials.password, user.passwordHash);
         if (!ok) return null;
         return {
@@ -49,23 +48,38 @@ export const authOptions: NextAuthOptions = {
     }),
   ],
   session: {
-    strategy: 'database',
+    strategy: 'jwt',
     maxAge: 30 * 24 * 60 * 60,
-    updateAge: 24 * 60 * 60,
   },
   pages: {
     signIn: '/login',
   },
   callbacks: {
-    async session({ session, user }) {
-      if (session.user) {
-        session.user.id = user.id;
-        (session.user as any).role = (user as any).role;
+    async jwt({ token, user, trigger }) {
+      // On sign-in, persist user fields to token
+      if (user) {
+        token.id = user.id;
+        token.role = (user as any).role;
+        token.mustChangePassword = (user as any).mustChangePassword ?? false;
+      }
+      // Re-fetch from DB on explicit session update or to pick up mustChangePassword changes
+      if (trigger === 'update' || trigger === 'signIn') {
         const dbUser = await db.query.users.findFirst({
-          where: eq(users.id, user.id),
-          columns: { mustChangePassword: true },
+          where: eq(users.id, token.id as string),
+          columns: { mustChangePassword: true, role: true },
         });
-        (session.user as any).mustChangePassword = dbUser?.mustChangePassword ?? false;
+        if (dbUser) {
+          token.mustChangePassword = dbUser.mustChangePassword;
+          token.role = dbUser.role;
+        }
+      }
+      return token;
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id as string;
+        (session.user as any).role = token.role;
+        (session.user as any).mustChangePassword = token.mustChangePassword ?? false;
       }
       return session;
     },
