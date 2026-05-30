@@ -51,7 +51,11 @@ export default function LoginPage() {
     e.preventDefault();
     setError('');
     setLoading(true);
-    const result = await signIn('email', { email: magicEmail.trim(), redirect: false });
+    const result = await signIn('email', {
+      email: magicEmail.trim(),
+      redirect: false,
+      callbackUrl: '/workbench',
+    });
     setLoading(false);
     if (result?.error) {
       setError('发送失败，请检查邮箱地址');
@@ -65,8 +69,19 @@ export default function LoginPage() {
     setError('');
     setLoading(true);
     try {
+      // Mark account for forced password change
       await requestReset.mutateAsync({ email: resetEmail.trim() });
-      setResetSent(true);
+      // Send real NextAuth magic-link with callbackUrl pointing to change-password
+      const result = await signIn('email', {
+        email: resetEmail.trim(),
+        redirect: false,
+        callbackUrl: '/change-password',
+      });
+      if (result?.error) {
+        setError('发送失败，请检查邮箱地址是否已注册');
+      } else {
+        setResetSent(true);
+      }
     } catch {
       setError('发送失败，请稍后重试');
     } finally {
