@@ -14,3 +14,7 @@ export * from './job-profiles';
 export * from './assessment-tools';
 export * from './project-reports';
 export * from './report-access-logs';
+export * from './assessment-batches';
+export * from './sample-ids';
+export * from './batch-reports';
+export * from './batch-access-tokens';

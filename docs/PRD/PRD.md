@@ -14,6 +14,7 @@
 2. [目标用户与价值主张](#2-目标用户与价值主张)
 3. [用户角色与权限体系](#3-用户角色与权限体系)
 4. [核心功能模块](#4-核心功能模块)
+   - 4.7 [匿名批次测评交付模块](#47-匿名批次测评交付模块)
 5. [数据模型与实体关系](#5-数据模型与实体关系)
 6. [非功能需求](#6-非功能需求)
 7. [附录](#7-附录)
@@ -312,6 +313,148 @@
 - [ ] ISO 27001信息安全管理
 - [ ] 心理测评伦理规范
 
+### 4.7 匿名批次测评交付模块
+
+> **设计原则**：平台仅存储匿名样本ID（如S001、S002…），受测者PII由B端采购方自持ID↔真名映射，平台零PII存储。
+
+#### 4.7.1 模块概述
+
+匿名批次测评交付模块覆盖从合同签约到项目收尾的完整交付闭环，涉及三方角色：
+
+| 角色 | 职责 |
+|------|------|
+| **平台方（经营者）** | 创建批次、配置联系人、导入样本ID、监控进度、出具报告、生成门户Token |
+| **B端采购方** | 签合同付款、提供样本ID名单、通知受测者、通过门户查看/下载报告 |
+| **C端受测者** | 完成测评（匿名，仅知自身ID）；可选经B端转发获取个人报告 |
+
+#### 4.7.2 六阶段交付流程
+
+```
+① 合同签约 → ② 批次配置与导入 → ③ 测评执行 → ④ 报告出具 → ⑤ 客户访问 → ⑥ 项目收尾
+```
+
+#### 4.7.3 批次配置功能
+
+**创建批次（平台方操作）**：
+
+| 配置项 | 说明 | 约束 |
+|--------|------|------|
+| 批次名称 | 如"2026Q2领导力测评" | 必填 |
+| 关联项目 | 绑定至已有项目 | 必填 |
+| 项目负责人姓名 | B端日常对接联系人 | **必填 NOT NULL** |
+| 项目负责人电话 | | **必填 NOT NULL** |
+| 项目负责人邮箱 | | **必填 NOT NULL** |
+| 危机应急联系人姓名 | 心理风险应急通知 | **必填 NOT NULL** |
+| 危机应急联系人电话 | | **必填 NOT NULL** |
+| 测评工具 | 使用的量表/测评软件 | 必填 |
+| 预计样本数 | 计划参与人数 | 必填 |
+| 截止日期 | 测评完成截止时间 | 必填 |
+
+**样本ID导入（CSV格式）**：
+
+```csv
+sample_id,group_label,notes
+S001,部门A,
+S002,部门A,
+S003,部门B,
+```
+
+- `sample_id`：唯一匿名标识，由B端生成（如S001~S999）
+- `group_label`：可选分组标签（用于群体报告维度分析）
+- `notes`：可选备注（不含PII）
+- 平台校验：ID唯一性、格式合规、无PII字段
+
+#### 4.7.4 付款条款灵活配置
+
+**两层设计**：
+
+```
+系统级默认值（全局配置）
+  ├── 预付款比例：50%（合同签约时）
+  ├── 中期款比例：30%（报告交付后）
+  └── 尾款比例：20%（项目收尾确认后）
+
+合同级覆盖（每份合同可单独设置）
+  ├── 可手工调整三项比例
+  └── 校验规则：三项合计必须 = 100%（系统强制验证）
+```
+
+**付款条款JSON结构**：
+
+```json
+{
+  "payment_terms": {
+    "deposit_pct": 50,
+    "midterm_pct": 30,
+    "final_pct": 20,
+    "custom_override": false,
+    "milestones": [
+      { "name": "预付款", "pct": 50, "trigger": "contract_signed" },
+      { "name": "中期款", "pct": 30, "trigger": "report_delivered" },
+      { "name": "尾款",   "pct": 20, "trigger": "project_closed" }
+    ]
+  }
+}
+```
+
+#### 4.7.5 双路径测评执行
+
+| 路径 | 说明 | 当前状态 |
+|------|------|----------|
+| **主路径（线下）** | 本地安装测评软件 → 受测者完成测评 → 平台方手动导出结果 → 上传至平台 → 关联样本ID | **当前使用** |
+| **副路径（线上·未来）** | 微信小程序/H5页面测评 → 结果自动回传平台 → 实时更新样本状态 | 规划中，待测评软件提供API |
+
+**主路径操作步骤**：
+1. 平台方在本地测评软件中创建对应测评项目
+2. B端将测评链接/说明转发给C端受测者
+3. C端受测者在本地软件完成测评（匿名，仅填写样本ID）
+4. 测评结束后，平台方从本地软件导出结果文件（CSV/Excel）
+5. 平台方在工作台上传结果文件，系统自动关联样本ID
+6. 系统更新对应样本状态为`completed`
+
+#### 4.7.6 报告出具
+
+**个人报告**：
+- 平台方从本地软件导出单份PDF报告
+- 在工作台上传并关联对应样本ID（如S001.pdf → S001）
+- 顾问审核后标记为已发布
+
+**群体报告**：
+- 平台方基于全量样本数据生成
+- 包含：总体分布、维度分析、分组对比（按group_label）、风险预警
+- 生成结项报告（项目执行全程摘要）
+
+**报告审核红线**：报告禁止AI直接对客交付，必须经顾问人工审核后方可发布。
+
+#### 4.7.7 客户门户访问
+
+**Token生成**：
+- 报告发布后，平台方生成B端专属访问Token
+- 门户入口：`/portal/batch/[token]`
+- Token有效期：可配置（默认30天）
+- 权限：查看批次进度、下载已发布报告
+
+**B端门户功能**：
+
+| 功能 | 说明 |
+|------|------|
+| 批次进度看板 | 样本完成率、各状态数量统计 |
+| 个人报告下载 | 按样本ID下载对应PDF |
+| 群体报告下载 | 下载完整群体分析报告 |
+| 结项报告下载 | 下载项目交付结项摘要 |
+
+**C端报告获取（可选）**：B端下载个人报告后，可自行通过ID↔真名映射转发给对应受测者，平台不直接接触C端。
+
+#### 4.7.8 核心红线
+
+| 红线 | 守护方式 |
+|------|----------|
+| 报告禁止AI直接对客 | 发布前必须经顾问审核，系统设审核状态卡口 |
+| 项目负责人必填 | `projectContact*` 字段 NOT NULL 数据库约束 |
+| 危机联系人必填 | `crisisContact*` 字段 NOT NULL 数据库约束 |
+| 平台零PII存储 | 系统只存样本ID，禁止录入姓名/身份证/手机等PII |
+| 单客户营收 ≤ 30% | Dashboard人工预警 |
+
 ---
 
 ## 5. 数据模型与实体关系
@@ -334,14 +477,26 @@
 │   │  Industry │         │  Milestone│         │  Report   │   │
 │   │  行业     │         │  里程碑   │         │  报告     │   │
 │   └──────────┘         └──────────┘         └────┬─────┘   │
-│                                                   │         │
-│                              ┌────────────────────┘         │
-│                              │                               │
-│                              ▼                               │
-│                        ┌──────────┐                         │
-│                        │ Assessment│                        │
-│                        │ 测评记录  │                        │
-│                        └──────────┘                         │
+│                              │                    │         │
+│                              │ 1:N                │         │
+│                              ▼                    │         │
+│                        ┌──────────────┐           │         │
+│                        │AssessmentBatch│◄──────────┘         │
+│                        │ 测评批次      │                     │
+│                        └──────┬───────┘                     │
+│                               │ 1:N                         │
+│                               ▼                             │
+│                        ┌──────────────┐  ┌───────────────┐  │
+│                        │  SampleId    │  │  BatchReport  │  │
+│                        │  样本ID      │  │  批次报告     │  │
+│                        └──────────────┘  └───────┬───────┘  │
+│                                                  │          │
+│                                                  │ 1:N      │
+│                                                  ▼          │
+│                                          ┌───────────────┐  │
+│                                          │BatchAccessToken│  │
+│                                          │门户访问Token  │  │
+│                                          └───────────────┘  │
 │                                                             │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -360,7 +515,7 @@
 | contact_phone | String | 联系人电话 |
 | contact_email | String | 联系人邮箱 |
 | risk_level | Enum | 风险等级 (低/中/高) |
-|准入_score | Integer | 准入评分 (0-100) |
+| admission_score | Integer | 准入评分 (0-100) |
 | created_at | Timestamp | 创建时间 |
 | updated_at | Timestamp | 更新时间 |
 
@@ -392,9 +547,23 @@
 | amount | Decimal | 合同金额 |
 | sign_date | Date | 签署日期 |
 | expire_date | Date | 到期日期 |
-| payment_terms | JSON | 付款条款 |
+| payment_terms | JSON | 付款条款（见下方结构说明） |
 | status | Enum | 合同状态 |
 | document_url | String | 合同文档地址 |
+
+**payment_terms JSON结构**（合同层覆盖系统默认值）：
+
+```json
+{
+  "deposit_pct": 50,
+  "midterm_pct": 30,
+  "final_pct": 20,
+  "custom_override": false
+}
+```
+
+> 约束：`deposit_pct + midterm_pct + final_pct = 100`，应用层强制校验。  
+> `custom_override = true` 表示该合同使用自定义比例而非系统默认值。
 
 #### Milestone (里程碑)
 
@@ -421,6 +590,75 @@
 | published_at | Timestamp | 发布时间 |
 | download_count | Integer | 下载次数 |
 
+---
+
+#### AssessmentBatch (测评批次) — 新增
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| project_id | UUID | 外键 → Project |
+| name | String | 批次名称，如"2026Q2领导力测评" |
+| assessment_tool | String | 使用的测评工具/量表名称 |
+| status | Enum | **draft / active / completed** |
+| expected_count | Integer | 预计样本数 |
+| deadline | Date | 测评截止日期 |
+| project_contact_name | String | 项目负责人姓名 **NOT NULL** |
+| project_contact_phone | String | 项目负责人电话 **NOT NULL** |
+| project_contact_email | String | 项目负责人邮箱 **NOT NULL** |
+| crisis_contact_name | String | 危机应急联系人姓名 **NOT NULL** |
+| crisis_contact_phone | String | 危机应急联系人电话 **NOT NULL** |
+| notes | Text | 备注 |
+| created_by | UUID | 创建人 → users |
+| created_at | Timestamp | 创建时间 |
+| updated_at | Timestamp | 更新时间 |
+
+#### SampleId (样本ID) — 新增
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| batch_id | UUID | 外键 → AssessmentBatch |
+| sample_code | String | 匿名样本编号，如S001（批次内唯一） |
+| group_label | String | 分组标签（可选，用于群体报告维度分析） |
+| status | Enum | **pending / in_progress / completed / reported** |
+| assessment_path | Enum | **offline / online**（主路径=offline） |
+| result_uploaded_at | Timestamp | 结果上传时间（主路径手动上传时记录） |
+| notes | Text | 备注（不含PII） |
+| created_at | Timestamp | 创建时间 |
+
+> **约束**：禁止在此表中录入姓名、手机、身份证等PII字段，由B端自持ID↔真名映射。
+
+#### BatchReport (批次报告) — 新增
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| batch_id | UUID | 外键 → AssessmentBatch |
+| sample_id | UUID | 外键 → SampleId（个人报告时必填，群体报告时为NULL） |
+| report_type | Enum | **individual / group / closing**（个人/群体/结项） |
+| status | Enum | **draft / pending_review / published / withdrawn** |
+| file_url | String | 上传的报告文件URL |
+| reviewer_id | UUID | 审核人 → users |
+| reviewed_at | Timestamp | 审核时间 |
+| published_at | Timestamp | 发布时间 |
+| created_at | Timestamp | 创建时间 |
+
+#### BatchAccessToken (批次门户访问Token) — 新增
+
+| 字段 | 类型 | 说明 |
+|------|------|------|
+| id | UUID | 主键 |
+| batch_id | UUID | 外键 → AssessmentBatch |
+| token | String | 随机Token（URL安全，≥32字符） |
+| expires_at | Timestamp | 过期时间（默认30天） |
+| is_active | Boolean | 是否有效（可手动撤销） |
+| last_accessed_at | Timestamp | 最后访问时间 |
+| created_by | UUID | 创建人 → users |
+| created_at | Timestamp | 创建时间 |
+
+> 门户入口：`/portal/batch/[token]`，B端通过此Token访问批次进度与报告下载。
+
 ### 5.3 状态枚举定义
 
 ```typescript
@@ -434,6 +672,42 @@ enum ProjectStatus {
   CLOSURE = '项目收尾',        // 收尾阶段
   COMPLETED = '已完成',        // 终态
   CANCELLED = '已取消'         // 终态
+}
+
+// 测评批次状态枚举
+enum BatchStatus {
+  DRAFT = 'draft',           // 草稿，配置中
+  ACTIVE = 'active',         // 进行中，测评执行阶段
+  COMPLETED = 'completed'    // 已完成，报告已出具
+}
+
+// 样本ID状态枚举
+enum SampleStatus {
+  PENDING = 'pending',           // 待测评
+  IN_PROGRESS = 'in_progress',   // 测评中
+  COMPLETED = 'completed',       // 测评完成，待上传/处理
+  REPORTED = 'reported'          // 报告已出具
+}
+
+// 批次报告类型枚举
+enum BatchReportType {
+  INDIVIDUAL = 'individual',   // 个人报告
+  GROUP = 'group',             // 群体报告
+  CLOSING = 'closing'          // 结项报告
+}
+
+// 批次报告状态枚举
+enum BatchReportStatus {
+  DRAFT = 'draft',
+  PENDING_REVIEW = 'pending_review',
+  PUBLISHED = 'published',
+  WITHDRAWN = 'withdrawn'
+}
+
+// 测评路径枚举
+enum AssessmentPath {
+  OFFLINE = 'offline',   // 线下本地软件（当前主路径）
+  ONLINE = 'online'      // 线上小程序/H5（未来副路径）
 }
 
 // 优先级枚举
@@ -527,6 +801,7 @@ enum RiskLevel {
 |------|------|----------|------|
 | v0.1.0 | 2026-05-23 | PRD框架搭建，完成第1-4章 | 大马 🐴 |
 | v0.2.0 | 2026-05-23 | 补充第5章数据模型、第6章非功能需求、第7章附录 | 大马 🐴 |
+| v0.3.0 | 2026-05-31 | 新增4.7节匿名批次测评交付模块；更新5.x数据模型加入4张新表（assessment_batches/sample_ids/batch_reports/batch_access_tokens）；更新付款条款字段；新增状态枚举 | 大马 🐴 |
 | v1.0.0 | - | 待发布正式版 | - |
 
 ### 7.3 待办清单
